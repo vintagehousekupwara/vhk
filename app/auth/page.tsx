@@ -1,199 +1,302 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Mail, Loader2, LockKeyhole } from "lucide-react";
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, onAuthStateChanged } from "firebase/auth";
-import { doc, setDoc, getDoc, deleteDoc } from "firebase/firestore";
-import { app, googleProvider, db } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
-import emailjs from '@emailjs/browser';
+import { motion, AnimatePresence } from "framer-motion";
+import { 
+  getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, 
+  onAuthStateChanged, sendEmailVerification, updateProfile, 
+  signInWithPopup, GoogleAuthProvider 
+} from "firebase/auth";
+import { doc, setDoc, getDoc } from "firebase/firestore";
+import { app, db } from "@/lib/firebase";
+import { Loader2, Mail, Lock, User, Phone, MapPin, Calendar, CheckCircle2 } from "lucide-react";
 
 export default function AuthPage() {
   const router = useRouter();
-  const [step, setStep] = useState(1); // 1: Enter Email, 2: Enter OTP
-  const [isLoading, setIsLoading] = useState(false);
+  
+  // State machine: "login" | "register" | "verify" | "complete_profile"
+  const [mode, setMode] = useState<"login" | "register" | "verify" | "complete_profile">("login");
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  
+  // Registration / Profile Data
+  const [formData, setFormData] = useState({
+    name: "", email: "", password: "", phone: "", address: "", age: ""
+  });
 
-  const [email, setEmail] = useState("");
-  const [userOtp, setUserOtp] = useState("");
+  // Temporarily hold Google user ID if profile is incomplete
+  const [tempUid, setTempUid] = useState<string | null>(null);
 
   useEffect(() => {
     const auth = getAuth(app);
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user && user.email !== "admin@thevintagehouse.com") {
-        router.push("/profile");
-      }
-    });
-    return () => unsubscribe();
-  }, [router]);
-
-  // ==========================================
-  // GOOGLE SIGN IN
-  // ==========================================
-  const handleGoogleSignIn = async () => {
-    setIsLoading(true); 
-    setError("");
-    try {
-      const auth = getAuth(app);
-      const result = await signInWithPopup(auth, googleProvider);
-      
-      await setDoc(doc(db, "users", result.user.uid), {
-        name: result.user.displayName,
-        email: result.user.email,
-        createdAt: new Date().toISOString()
-      }, { merge: true });
-      
-      router.push("/profile");
-    } catch (err: any) {
-      console.error("Google Sign-In Error:", err.code, err.message);
-      setError(err.message || "Google Sign-In failed.");
-      setIsLoading(false);
-    }
-  };
-
-  // ==========================================
-  // PASSWORDLESS OTP FLOW
-  // ==========================================
-  const handleSendOTP = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!process.env.NEXT_PUBLIC_EMAILJS_SERVICE_ID) return setError("Email service misconfigured.");
-    setIsLoading(true); 
-    setError("");
-
-    try {
-      const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
-      const expiry = new Date(new Date().getTime() + 15 * 60000);
-
-      await setDoc(doc(db, "otps", email), { otp: generatedOtp, expiresAt: expiry.toISOString() });
-
-      await emailjs.send(
-        process.env.NEXT_PUBLIC_EMAILJS_SERVICE_ID!,
-        process.env.NEXT_PUBLIC_EMAILJS_TEMPLATE_ID!,
-        { to_email: email, passcode: generatedOtp, time: expiry.toLocaleTimeString() },
-        process.env.NEXT_PUBLIC_EMAILJS_PUBLIC_KEY!
-      );
-
-      setStep(2);
-    } catch (err: any) {
-      console.error("EmailJS Error:", err);
-      setError("Failed to send OTP. Please check your network.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-const handleVerifyOTP = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true); 
-    setError("");
-
-    try {
-      const otpDoc = await getDoc(doc(db, "otps", email));
-      
-      if (otpDoc.exists() && otpDoc.data().otp === userOtp) {
-        if (new Date() > new Date(otpDoc.data().expiresAt)) {
-          setError("OTP expired. Request a new one."); 
-          setIsLoading(false); 
+    const unsub = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        // If email is not verified, trap them in verify screen
+        if (!user.emailVerified) {
+          setMode("verify");
           return;
         }
-
-        const auth = getAuth(app);
-        // Deterministic highly secure dummy password
-        const secureDummyPassword = `VINTAGE_${email}_SECURE!992026`; 
-
-        try {
-          // 1. Try to sign in an existing OTP user
-          await signInWithEmailAndPassword(auth, email, secureDummyPassword);
-        } catch (signInError: any) {
-          
-          // 2. If sign in fails, attempt to create the user
-          try {
-            const userCredential = await createUserWithEmailAndPassword(auth, email, secureDummyPassword);
-            await setDoc(doc(db, "users", userCredential.user.uid), {
-              email: email,
-              name: email.split('@')[0],
-              createdAt: new Date().toISOString()
-            });
-          } catch (signUpError: any) {
-            // 3. THIS CATCHES THE GOOGLE COLLISION!
-            if (signUpError.code === 'auth/email-already-in-use') {
-              setError("This email is registered via Google. Please use 'Continue with Google' above.");
-            } else {
-              setError(signUpError.message);
-            }
-            setIsLoading(false);
-            return;
-          }
+        
+        // If verified, ensure they exist in Firestore database with full details
+        const docRef = doc(db, "users", user.uid);
+        const docSnap = await getDoc(docRef);
+        
+        if (docSnap.exists() && docSnap.data().address) {
+          // Fully verified and data complete -> Send to profile
+          router.push("/profile");
+        } else {
+          // Email is verified (like Google Auth), but data is missing!
+          setFormData(prev => ({ ...prev, name: user.displayName || "", email: user.email || "" }));
+          setTempUid(user.uid);
+          setMode("complete_profile");
         }
+      }
+    });
+    return () => unsub();
+  }, [router]);
 
-        await deleteDoc(doc(db, "otps", email)); // Clean up
-        router.push("/profile");
-      } else {
-        setError("Invalid OTP.");
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleEmailSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true); setError("");
+
+    try {
+      const auth = getAuth(app);
+      const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
+      const user = userCredential.user;
+
+      // Set display name in Auth
+      await updateProfile(user, { displayName: formData.name });
+
+      // Save complete details to Firestore Database immediately
+      await setDoc(doc(db, "users", user.uid), {
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        address: formData.address,
+        age: formData.age,
+        createdAt: new Date().toISOString()
+      });
+
+      // Send Verification Email
+      await sendEmailVerification(user);
+      setMode("verify");
+      
+    } catch (err: any) {
+      setError(err.message.includes("email-already-in-use") ? "Email already exists." : "Failed to register. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEmailLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true); setError("");
+
+    try {
+      const auth = getAuth(app);
+      const userCredential = await signInWithEmailAndPassword(auth, formData.email, formData.password);
+      
+      if (!userCredential.user.emailVerified) {
+        setMode("verify");
       }
     } catch (err: any) {
-      console.error("Auth process error:", err);
-      setError("Authentication failed.");
+      setError("Invalid email or password.");
     } finally {
-      setIsLoading(false);
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleAuth = async () => {
+    setLoading(true); setError("");
+    try {
+      const auth = getAuth(app);
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      
+      // Check if user exists in Database
+      const userDoc = await getDoc(doc(db, "users", result.user.uid));
+      if (!userDoc.exists() || !userDoc.data().address) {
+        setFormData(prev => ({ ...prev, name: result.user.displayName || "", email: result.user.email || "" }));
+        setTempUid(result.user.uid);
+        setMode("complete_profile");
+      } else {
+        router.push("/profile");
+      }
+    } catch (err: any) {
+      setError("Google Sign-In failed.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCompleteProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!tempUid) return;
+    setLoading(true); setError("");
+
+    try {
+      await setDoc(doc(db, "users", tempUid), {
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        address: formData.address,
+        age: formData.age,
+        createdAt: new Date().toISOString()
+      }, { merge: true });
+
+      router.push("/profile");
+    } catch (err) {
+      setError("Failed to save details.");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <main className="min-h-screen bg-brand-bg flex items-center justify-center py-20 px-4">
-      <div className="w-full max-w-md bg-white p-8 rounded-2xl shadow-floating border border-brand-secondary">
+    <main className="min-h-screen bg-brand-bg flex items-center justify-center p-4 pt-24">
+      <div className="w-full max-w-md bg-white p-8 rounded-2xl shadow-sm border border-brand-secondary">
         
         <div className="text-center mb-8">
-          <h1 className="font-serif text-3xl text-brand-text mb-2">Guest Portal</h1>
-          <p className="text-brand-muted text-sm">
-            {step === 1 ? "Passwordless secure login." : "Verify your email to continue."}
+          <h1 className="font-serif text-3xl text-brand-text">Sign Up | Sign In</h1>
+          <p className="text-xs tracking-widest text-brand-muted uppercase mt-2">
+            {mode === "login" && "The Vintage House Kupwara"}
+            {mode === "register" && "Create Guest Account"}
+            {mode === "verify" && "Verify Email Address"}
+            {mode === "complete_profile" && "Complete Your Profile"}
           </p>
         </div>
 
         <AnimatePresence mode="wait">
-          {step === 1 ? (
-            <motion.div key="form" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              
-              <button onClick={handleGoogleSignIn} type="button" className="w-full bg-white border border-gray-300 text-gray-700 py-3 rounded-lg flex items-center justify-center gap-3 font-medium hover:bg-gray-50 transition-colors mb-6 shadow-sm">
-                <svg className="w-5 h-5" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
-                Continue with Google
-              </button>
-
-              <div className="relative flex items-center justify-center mb-6">
-                <div className="border-t border-gray-200 w-full"></div>
-                <span className="bg-white px-3 text-xs text-gray-400 absolute uppercase tracking-widest">Or Secure OTP</span>
-              </div>
-
-              <form onSubmit={handleSendOTP} className="space-y-4">
-                <div className="relative">
-                  <Mail size={18} className="absolute left-4 top-3.5 text-brand-accent" />
-                  <input required type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Enter your email address" className="w-full pl-12 pr-4 py-3 bg-brand-bg border border-brand-secondary focus:border-brand-primary focus:outline-none" />
-                </div>
-                {error && <p className="text-red-500 text-xs font-bold bg-red-50 p-2 rounded">{error}</p>}
-                <button type="submit" disabled={isLoading || !email} className="w-full bg-brand-text text-white py-4 text-sm tracking-widest uppercase hover:bg-brand-primary transition-colors flex items-center justify-center">
-                  {isLoading ? <Loader2 className="animate-spin" size={18} /> : "Send Login Code"}
-                </button>
-              </form>
-            </motion.div>
-          ) : (
-            <motion.div key="otp" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
-              <form onSubmit={handleVerifyOTP} className="space-y-6 text-center">
-                <div className="w-16 h-16 bg-brand-secondary/50 rounded-full flex items-center justify-center mx-auto mb-2 text-brand-primary">
-                  <LockKeyhole size={32} />
-                </div>
-                <input 
-                  type="text" maxLength={6} required value={userOtp} onChange={(e) => setUserOtp(e.target.value)}
-                  placeholder="••••••" className="w-full py-4 text-center text-2xl tracking-[1em] font-mono bg-brand-bg border border-brand-secondary focus:border-brand-primary focus:outline-none"
-                />
-                {error && <p className="text-red-500 text-xs font-bold bg-red-50 p-2 rounded">{error}</p>}
-                <button type="submit" disabled={isLoading || userOtp.length !== 6} className="w-full bg-brand-primary text-white py-4 text-sm tracking-widest uppercase hover:bg-[#A65520] transition-colors flex items-center justify-center">
-                  {isLoading ? <Loader2 className="animate-spin" size={18} /> : "Authenticate & Login"}
-                </button>
-              </form>
+          {error && (
+            <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="bg-red-50 text-red-600 p-3 rounded-lg text-sm font-bold text-center mb-6">
+              {error}
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* --- LOGIN FORM --- */}
+        {mode === "login" && (
+          <form onSubmit={handleEmailLogin} className="space-y-4">
+            <div className="relative">
+              <Mail className="absolute left-3 top-3.5 text-gray-400" size={18} />
+              <input required type="email" name="email" value={formData.email} onChange={handleChange} placeholder="Email Address" className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:border-brand-primary outline-none text-sm" />
+            </div>
+            <div className="relative">
+              <Lock className="absolute left-3 top-3.5 text-gray-400" size={18} />
+              <input required type="password" name="password" value={formData.password} onChange={handleChange} placeholder="Password" className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:border-brand-primary outline-none text-sm" />
+            </div>
+            
+            <button type="submit" disabled={loading} className="w-full bg-brand-primary text-white py-3 rounded-lg font-bold tracking-widest uppercase text-sm hover:bg-[#A65520] transition-colors mt-2">
+              {loading ? <Loader2 className="animate-spin mx-auto" size={20} /> : "Sign In"}
+            </button>
+
+            <div className="flex items-center gap-4 my-6">
+              <div className="h-px bg-gray-200 flex-1"></div>
+              <span className="text-xs text-gray-400 uppercase tracking-widest">OR</span>
+              <div className="h-px bg-gray-200 flex-1"></div>
+            </div>
+
+            <button type="button" onClick={handleGoogleAuth} disabled={loading} className="w-full bg-white border border-gray-200 text-gray-700 py-3 rounded-lg font-bold flex items-center justify-center gap-3 hover:bg-gray-50 transition-colors">
+              <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" className="w-5 h-5" />
+              Continue with Google
+            </button>
+
+            <p className="text-center text-sm text-gray-500 mt-6">
+              New to The Vintage House? <button type="button" onClick={() => setMode("register")} className="text-brand-primary font-bold hover:underline">Create Account</button>
+            </p>
+          </form>
+        )}
+
+        {/* --- REGISTRATION FORM (Full Details Required) --- */}
+        {mode === "register" && (
+          <form onSubmit={handleEmailSignup} className="space-y-4">
+            <div className="relative">
+              <User className="absolute left-3 top-3.5 text-gray-400" size={18} />
+              <input required type="text" name="name" value={formData.name} onChange={handleChange} placeholder="Full Name" className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:border-brand-primary outline-none text-sm" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="relative">
+                <Phone className="absolute left-3 top-3.5 text-gray-400" size={18} />
+                <input required type="tel" name="phone" value={formData.phone} onChange={handleChange} placeholder="Phone Number" className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:border-brand-primary outline-none text-sm" />
+              </div>
+              <div className="relative">
+                <Calendar className="absolute left-3 top-3.5 text-gray-400" size={18} />
+                <input required type="number" min="18" name="age" value={formData.age} onChange={handleChange} placeholder="Age (18+)" className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:border-brand-primary outline-none text-sm" />
+              </div>
+            </div>
+            <div className="relative">
+              <MapPin className="absolute left-3 top-3.5 text-gray-400" size={18} />
+              <input required type="text" name="address" value={formData.address} onChange={handleChange} placeholder="Complete Physical Address" className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:border-brand-primary outline-none text-sm" />
+            </div>
+            <div className="relative">
+              <Mail className="absolute left-3 top-3.5 text-gray-400" size={18} />
+              <input required type="email" name="email" value={formData.email} onChange={handleChange} placeholder="Email Address" className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:border-brand-primary outline-none text-sm" />
+            </div>
+            <div className="relative">
+              <Lock className="absolute left-3 top-3.5 text-gray-400" size={18} />
+              <input required type="password" name="password" minLength={8} value={formData.password} onChange={handleChange} placeholder="Password (Min 8 chars)" className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:border-brand-primary outline-none text-sm" />
+            </div>
+
+            <p className="text-[10px] text-gray-400 text-center uppercase tracking-widest mt-2">All fields are mandatory for security.</p>
+            
+            <button type="submit" disabled={loading} className="w-full bg-brand-primary text-white py-3 rounded-lg font-bold tracking-widest uppercase text-sm hover:bg-[#A65520] transition-colors mt-2">
+              {loading ? <Loader2 className="animate-spin mx-auto" size={20} /> : "Create Secure Account"}
+            </button>
+
+            <p className="text-center text-sm text-gray-500 mt-6">
+              Already have an account? <button type="button" onClick={() => setMode("login")} className="text-brand-primary font-bold hover:underline">Log In</button>
+            </p>
+          </form>
+        )}
+
+        {/* --- COMPLETE PROFILE FORM (For Google Logins missing data) --- */}
+        {mode === "complete_profile" && (
+          <form onSubmit={handleCompleteProfile} className="space-y-4">
+            <div className="bg-blue-50 p-4 rounded-lg mb-6 border border-blue-100">
+              <p className="text-sm text-blue-800 font-medium">To complete your Google Sign-In, please provide your contact details for delivery and booking verification.</p>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="relative">
+                <Phone className="absolute left-3 top-3.5 text-gray-400" size={18} />
+                <input required type="tel" name="phone" value={formData.phone} onChange={handleChange} placeholder="Phone Number" className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:border-brand-primary outline-none text-sm" />
+              </div>
+              <div className="relative">
+                <Calendar className="absolute left-3 top-3.5 text-gray-400" size={18} />
+                <input required type="number" min="18" name="age" value={formData.age} onChange={handleChange} placeholder="Age (18+)" className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:border-brand-primary outline-none text-sm" />
+              </div>
+            </div>
+            <div className="relative">
+              <MapPin className="absolute left-3 top-3.5 text-gray-400" size={18} />
+              <input required type="text" name="address" value={formData.address} onChange={handleChange} placeholder="Complete Physical Address" className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:border-brand-primary outline-none text-sm" />
+            </div>
+            
+            <button type="submit" disabled={loading} className="w-full bg-brand-primary text-white py-3 rounded-lg font-bold tracking-widest uppercase text-sm hover:bg-[#A65520] transition-colors mt-2">
+              {loading ? <Loader2 className="animate-spin mx-auto" size={20} /> : "Save & Continue"}
+            </button>
+          </form>
+        )}
+
+        {/* --- VERIFY EMAIL SCREEN --- */}
+        {mode === "verify" && (
+          <div className="text-center py-6">
+            <div className="w-20 h-20 bg-green-50 text-green-500 rounded-full flex items-center justify-center mx-auto mb-6">
+              <CheckCircle2 size={40} />
+            </div>
+            <h2 className="text-xl font-bold text-gray-800 mb-2">Verify your email</h2>
+            <p className="text-sm text-gray-500 mb-6">
+              We've sent a verification link to <strong>{formData.email}</strong>. Please click the link to activate your account.
+            </p>
+            <button onClick={() => window.location.reload()} className="bg-gray-900 text-white px-8 py-3 rounded-lg font-bold text-sm tracking-widest uppercase hover:bg-gray-800 transition-colors">
+              I've Verified, Continue
+            </button>
+          </div>
+        )}
+
       </div>
     </main>
   );

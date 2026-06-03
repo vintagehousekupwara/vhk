@@ -99,7 +99,7 @@ export default function HomeClient({ rooms, dishes }: { rooms: any[], dishes: an
           </h2>
           
           <p className="text-brand-muted text-sm md:text-lg xl:text-xl mb-8 max-w-lg leading-relaxed font-light hidden sm:block">
-            Immerse yourself in world-class hospitality. Discover our exclusive collection of premium suites, designed for those who appreciate the finer things.
+            Immerse yourself in world-class hospitality at The Vintage House Kupwara. Discover our exclusive collection of premium luxury suites, designed for those who appreciate the finer things in North Kashmir.
           </p>
           
           <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-3 w-full sm:w-auto">
