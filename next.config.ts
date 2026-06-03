@@ -31,6 +31,18 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**', 
       },
+      {
+        protocol: 'https',
+        hostname: 'encrypted-tbn0.gstatic.com',
+        port: '',
+        pathname: '/**', 
+      },
+      {
+        protocol: 'https',
+        hostname: 'firebasestorage.googleapis.com',
+        port: '',
+        pathname: '/**', 
+      },
     ],
   },
   // This header configuration allows Firebase Google Sign-In popups to work in Next 15

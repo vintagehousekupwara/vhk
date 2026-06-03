@@ -1,60 +1,68 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, 
-  onAuthStateChanged, sendEmailVerification, updateProfile, 
-  signInWithPopup, GoogleAuthProvider 
+  onAuthStateChanged, updateProfile, signInWithPopup, GoogleAuthProvider,
+  setPersistence, browserLocalPersistence 
 } from "firebase/auth";
 import { doc, setDoc, getDoc } from "firebase/firestore";
 import { app, db } from "@/lib/firebase";
-import { Loader2, Mail, Lock, User, Phone, MapPin, Calendar, CheckCircle2 } from "lucide-react";
+import { Loader2, Mail, Lock, User, Phone, MapPin, Calendar } from "lucide-react";
 
 export default function AuthPage() {
   const router = useRouter();
+  const auth = getAuth(app);
   
-  // State machine: "login" | "register" | "verify" | "complete_profile"
-  const [mode, setMode] = useState<"login" | "register" | "verify" | "complete_profile">("login");
+  const [mode, setMode] = useState<"login" | "register" | "complete_profile">("login");
   const [loading, setLoading] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true); 
   const [error, setError] = useState("");
   
-  // Registration / Profile Data
+  // FIX: This blocks Firebase's background listener from hijacking the screen while we are actively saving data.
+  const isHandlingAuth = useRef(false);
+
   const [formData, setFormData] = useState({
     name: "", email: "", password: "", phone: "", address: "", age: ""
   });
 
-  // Temporarily hold Google user ID if profile is incomplete
   const [tempUid, setTempUid] = useState<string | null>(null);
 
   useEffect(() => {
-    const auth = getAuth(app);
+    // FIX: Strictly enforce Local Caching. The user stays logged in across tabs and reloads until cache is cleared.
+    setPersistence(auth, browserLocalPersistence).catch(console.error);
+
     const unsub = onAuthStateChanged(auth, async (user) => {
+      // If our manual sign-up/login buttons are working, ignore this automatic background check.
+      if (isHandlingAuth.current) return;
+
       if (user) {
-        // If email is not verified, trap them in verify screen
-        if (!user.emailVerified) {
-          setMode("verify");
-          return;
+        try {
+          const docRef = doc(db, "users", user.uid);
+          const docSnap = await getDoc(docRef);
+          
+          if (docSnap.exists() && docSnap.data().address) {
+            // User is fully logged in and cached -> Send directly to profile
+            router.replace("/profile");
+          } else {
+            setFormData(prev => ({ ...prev, name: user.displayName || "", email: user.email || "" }));
+            setTempUid(user.uid);
+            setMode("complete_profile");
+            setIsInitializing(false);
+          }
+        } catch (err) {
+          setIsInitializing(false);
         }
-        
-        // If verified, ensure they exist in Firestore database with full details
-        const docRef = doc(db, "users", user.uid);
-        const docSnap = await getDoc(docRef);
-        
-        if (docSnap.exists() && docSnap.data().address) {
-          // Fully verified and data complete -> Send to profile
-          router.push("/profile");
-        } else {
-          // Email is verified (like Google Auth), but data is missing!
-          setFormData(prev => ({ ...prev, name: user.displayName || "", email: user.email || "" }));
-          setTempUid(user.uid);
-          setMode("complete_profile");
-        }
+      } else {
+        // No cached user found (or cache was cleared), show the login screen
+        setIsInitializing(false);
       }
     });
+    
     return () => unsub();
-  }, [router]);
+  }, [auth, router]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -63,16 +71,14 @@ export default function AuthPage() {
   const handleEmailSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true); setError("");
+    isHandlingAuth.current = true; // Block background hijacks
 
     try {
-      const auth = getAuth(app);
       const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
       const user = userCredential.user;
 
-      // Set display name in Auth
       await updateProfile(user, { displayName: formData.name });
 
-      // Save complete details to Firestore Database immediately
       await setDoc(doc(db, "users", user.uid), {
         name: formData.name,
         email: formData.email,
@@ -82,56 +88,61 @@ export default function AuthPage() {
         createdAt: new Date().toISOString()
       });
 
-      // Send Verification Email
-      await sendEmailVerification(user);
-      setMode("verify");
-      
+      router.replace("/profile");
     } catch (err: any) {
       setError(err.message.includes("email-already-in-use") ? "Email already exists." : "Failed to register. Please try again.");
-    } finally {
       setLoading(false);
-    }
+      isHandlingAuth.current = false;
+    } 
   };
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true); setError("");
+    isHandlingAuth.current = true; // Block background hijacks
 
     try {
-      const auth = getAuth(app);
       const userCredential = await signInWithEmailAndPassword(auth, formData.email, formData.password);
-      
-      if (!userCredential.user.emailVerified) {
-        setMode("verify");
+      const docSnap = await getDoc(doc(db, "users", userCredential.user.uid));
+
+      if (docSnap.exists() && docSnap.data().address) {
+        router.replace("/profile");
+      } else {
+        setTempUid(userCredential.user.uid);
+        setMode("complete_profile");
+        setLoading(false);
+        isHandlingAuth.current = false;
       }
     } catch (err: any) {
       setError("Invalid email or password.");
-    } finally {
       setLoading(false);
-    }
+      isHandlingAuth.current = false;
+    } 
   };
 
   const handleGoogleAuth = async () => {
     setLoading(true); setError("");
+    isHandlingAuth.current = true; // Block background hijacks
+    
     try {
-      const auth = getAuth(app);
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
       
-      // Check if user exists in Database
       const userDoc = await getDoc(doc(db, "users", result.user.uid));
       if (!userDoc.exists() || !userDoc.data().address) {
         setFormData(prev => ({ ...prev, name: result.user.displayName || "", email: result.user.email || "" }));
         setTempUid(result.user.uid);
         setMode("complete_profile");
+        setLoading(false);
+        isHandlingAuth.current = false;
       } else {
-        router.push("/profile");
+        router.replace("/profile");
       }
     } catch (err: any) {
       setError("Google Sign-In failed.");
-    } finally {
       setLoading(false);
-    }
+      isHandlingAuth.current = false;
+    } 
   };
 
   const handleCompleteProfile = async (e: React.FormEvent) => {
@@ -149,24 +160,31 @@ export default function AuthPage() {
         createdAt: new Date().toISOString()
       }, { merge: true });
 
-      router.push("/profile");
+      router.replace("/profile");
     } catch (err) {
       setError("Failed to save details.");
-    } finally {
       setLoading(false);
-    }
+    } 
   };
+
+  // Seamless loader while checking browser cache
+  if (isInitializing) {
+    return (
+      <main className="min-h-screen bg-brand-bg flex items-center justify-center">
+        <Loader2 className="animate-spin text-brand-primary w-10 h-10" />
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-brand-bg flex items-center justify-center p-4 pt-24">
       <div className="w-full max-w-md bg-white p-8 rounded-2xl shadow-sm border border-brand-secondary">
         
         <div className="text-center mb-8">
-          <h1 className="font-serif text-3xl text-brand-text">Sign Up | Sign In</h1>
+          <h1 className="font-serif text-3xl text-brand-text">The Vintage House</h1>
           <p className="text-xs tracking-widest text-brand-muted uppercase mt-2">
-            {mode === "login" && "The Vintage House Kupwara"}
+            {mode === "login" && "Secure Guest Login"}
             {mode === "register" && "Create Guest Account"}
-            {mode === "verify" && "Verify Email Address"}
             {mode === "complete_profile" && "Complete Your Profile"}
           </p>
         </div>
@@ -179,7 +197,6 @@ export default function AuthPage() {
           )}
         </AnimatePresence>
 
-        {/* --- LOGIN FORM --- */}
         {mode === "login" && (
           <form onSubmit={handleEmailLogin} className="space-y-4">
             <div className="relative">
@@ -212,7 +229,6 @@ export default function AuthPage() {
           </form>
         )}
 
-        {/* --- REGISTRATION FORM (Full Details Required) --- */}
         {mode === "register" && (
           <form onSubmit={handleEmailSignup} className="space-y-4">
             <div className="relative">
@@ -254,7 +270,6 @@ export default function AuthPage() {
           </form>
         )}
 
-        {/* --- COMPLETE PROFILE FORM (For Google Logins missing data) --- */}
         {mode === "complete_profile" && (
           <form onSubmit={handleCompleteProfile} className="space-y-4">
             <div className="bg-blue-50 p-4 rounded-lg mb-6 border border-blue-100">
@@ -280,23 +295,6 @@ export default function AuthPage() {
             </button>
           </form>
         )}
-
-        {/* --- VERIFY EMAIL SCREEN --- */}
-        {mode === "verify" && (
-          <div className="text-center py-6">
-            <div className="w-20 h-20 bg-green-50 text-green-500 rounded-full flex items-center justify-center mx-auto mb-6">
-              <CheckCircle2 size={40} />
-            </div>
-            <h2 className="text-xl font-bold text-gray-800 mb-2">Verify your email</h2>
-            <p className="text-sm text-gray-500 mb-6">
-              We've sent a verification link to <strong>{formData.email}</strong>. Please click the link to activate your account.
-            </p>
-            <button onClick={() => window.location.reload()} className="bg-gray-900 text-white px-8 py-3 rounded-lg font-bold text-sm tracking-widest uppercase hover:bg-gray-800 transition-colors">
-              I've Verified, Continue
-            </button>
-          </div>
-        )}
-
       </div>
     </main>
   );

@@ -2,12 +2,10 @@ import HomeClient from "@/components/Home/HomeClient";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
-// Force dynamic rendering if you need live data fetching on the server
-export const dynamic = "force-dynamic";
+// Cache this page for 30 days (Admin panel will break this cache instantly when updated)
+export const revalidate = 2592000;
 
 export default async function HomePage() {
-  // Example server-side fetch for your rooms and dishes
-  // Adjust these collection names if they differ in your database
   let rooms: any[] = [];
   let dishes: any[] = [];
 
@@ -47,7 +45,7 @@ export default async function HomePage() {
     }
   };
 
-return (
+  return (
     <>
       {/* Invisible Schema Markup for Google */}
       <script

@@ -6,6 +6,8 @@ import { collection, doc, onSnapshot, query, where, writeBatch, increment } from
 import { db } from "@/lib/firebase";
 import { CalendarDays, Users, AlertCircle, CheckCircle2, ChevronRight, ChevronLeft, ShieldCheck, Clock, Ban, CheckCircle, Loader2, Mail } from "lucide-react";
 import DatePicker from "react-datepicker";
+// @ts-ignore
+import "react-datepicker/dist/react-datepicker.css"; // Ensure styles are imported
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import emailjs from '@emailjs/browser';
@@ -518,7 +520,11 @@ function BookingForm() {
 export default function BookPage() {
   return (
     <div className="min-h-screen bg-brand-bg pt-28 px-4 md:px-8">
-      <Suspense fallback={<div className="flex justify-center items-center h-64 text-brand-primary"><div className="w-8 h-8 border-4 border-brand-primary border-t-transparent rounded-full animate-spin"></div></div>}>
+      <Suspense fallback={
+        <div className="flex justify-center items-center h-64 text-brand-primary">
+          <div className="w-8 h-8 border-4 border-brand-primary border-t-transparent rounded-full animate-spin"></div>
+        </div>
+      }>
         <BookingForm />
       </Suspense>
     </div>

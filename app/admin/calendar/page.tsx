@@ -5,6 +5,7 @@ import { collection, query, where, onSnapshot, doc, setDoc } from "firebase/fire
 import { db } from "@/lib/firebase";
 import { ChevronLeft, ChevronRight, Loader2, Save, X, BedDouble, Settings, IndianRupee } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { purgeWebsiteCache } from "@/app/actions/cache";
 
 const formatYYYYMMDD = (date: Date) => {
   const y = date.getFullYear();
@@ -94,7 +95,7 @@ export default function AdminCalendar() {
   }, [currentDate]);
 
   const openEditor = (dateStr: string, isPast: boolean) => {
-    if (isPast) return; // Prevent opening editor for past dates
+    if (isPast) return; 
     const existing = inventoryMap[dateStr];
     setEditForm({ available: existing ? existing.available : 0 });
     setEditingDate(dateStr);
@@ -120,6 +121,10 @@ export default function AdminCalendar() {
 
     try {
       await setDoc(doc(db, "room_inventory", docId), payload, { merge: true });
+      
+      // FIRE THE CACHE BREAKER TO UPDATE LIVE SITE
+      await purgeWebsiteCache();
+      
       setEditingDate(null);
     } catch (error) {
       alert("Failed to save. Check your connection.");
@@ -147,6 +152,10 @@ export default function AdminCalendar() {
         },
         updatedAt: new Date().toISOString()
       }, { merge: true });
+      
+      // FIRE THE CACHE BREAKER TO UPDATE LIVE SITE
+      await purgeWebsiteCache();
+
       setIsPricingModalOpen(false);
     } catch (error) {
       alert("Failed to save pricing.");
@@ -155,7 +164,6 @@ export default function AdminCalendar() {
     }
   };
 
-  // Pre-calculate today at midnight for accurate past-date checking
   const todayAtMidnight = new Date();
   todayAtMidnight.setHours(0, 0, 0, 0);
 
@@ -244,7 +252,6 @@ export default function AdminCalendar() {
         </div>
       </div>
 
-      {/* Editor Modal for Availability */}
       <AnimatePresence>
         {editingDate && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center px-4">
@@ -271,7 +278,6 @@ export default function AdminCalendar() {
         )}
       </AnimatePresence>
 
-      {/* Advanced Global Pricing Modal */}
       <AnimatePresence>
         {isPricingModalOpen && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center px-4 py-6">
@@ -287,7 +293,6 @@ export default function AdminCalendar() {
               <form onSubmit={handleSavePricing} className="p-6">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                   
-                  {/* King Size Config */}
                   <div className="space-y-4">
                     <h4 className="font-serif text-xl border-b pb-2 text-brand-text">King Size Room</h4>
                     <div className="grid grid-cols-2 gap-4">
@@ -306,7 +311,6 @@ export default function AdminCalendar() {
                     </div>
                   </div>
 
-                  {/* Double Bed Config */}
                   <div className="space-y-4">
                     <h4 className="font-serif text-xl border-b pb-2 text-brand-text">Double Bed Room</h4>
                     <div className="grid grid-cols-2 gap-4">
@@ -337,7 +341,7 @@ export default function AdminCalendar() {
 
                 <div className="mt-8 border-t pt-6">
                   <button type="submit" disabled={isSaving} className="w-full bg-slate-900 text-white py-4 rounded-lg font-bold tracking-widest uppercase hover:bg-slate-800 transition-colors flex justify-center items-center gap-2">
-                    {isSaving ? <Loader2 className="animate-spin" size={18} /> : <><Save size={18} /> Update Pricing </>}
+                    {isSaving ? <Loader2 className="animate-spin" size={18} /> : <><Save size={18} /> Update Pricing Engine</>}
                   </button>
                 </div>
               </form>
@@ -345,7 +349,6 @@ export default function AdminCalendar() {
           </div>
         )}
       </AnimatePresence>
-
     </div>
   );
 }
