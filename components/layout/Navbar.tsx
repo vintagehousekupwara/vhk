@@ -10,7 +10,6 @@ import { useCart } from "@/context/CartContext";
 
 const NAV_LINKS = [
   { name: "Home", path: "/" },
-  { name: "Rooms", path: "/rooms" },
   { name: "Menu", path: "/menu" },
   { name: "About", path: "/about" },
 ];

@@ -33,6 +33,20 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  // This header configuration allows Firebase Google Sign-In popups to work in Next 15
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'Cross-Origin-Opener-Policy',
+            value: 'same-origin-allow-popups', 
+          },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;

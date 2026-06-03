@@ -32,7 +32,8 @@ export default function AuthPage() {
   // GOOGLE SIGN IN
   // ==========================================
   const handleGoogleSignIn = async () => {
-    setIsLoading(true); setError("");
+    setIsLoading(true); 
+    setError("");
     try {
       const auth = getAuth(app);
       const result = await signInWithPopup(auth, googleProvider);
@@ -45,7 +46,8 @@ export default function AuthPage() {
       
       router.push("/profile");
     } catch (err: any) {
-      setError("Google Sign-In failed.");
+      console.error("Google Sign-In Error:", err.code, err.message);
+      setError(err.message || "Google Sign-In failed.");
       setIsLoading(false);
     }
   };
@@ -56,7 +58,8 @@ export default function AuthPage() {
   const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!process.env.NEXT_PUBLIC_EMAILJS_SERVICE_ID) return setError("Email service misconfigured.");
-    setIsLoading(true); setError("");
+    setIsLoading(true); 
+    setError("");
 
     try {
       const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -73,38 +76,55 @@ export default function AuthPage() {
 
       setStep(2);
     } catch (err: any) {
+      console.error("EmailJS Error:", err);
       setError("Failed to send OTP. Please check your network.");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleVerifyOTP = async (e: React.FormEvent) => {
+const handleVerifyOTP = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true); setError("");
+    setIsLoading(true); 
+    setError("");
 
     try {
       const otpDoc = await getDoc(doc(db, "otps", email));
       
       if (otpDoc.exists() && otpDoc.data().otp === userOtp) {
         if (new Date() > new Date(otpDoc.data().expiresAt)) {
-          setError("OTP expired. Request a new one."); setIsLoading(false); return;
+          setError("OTP expired. Request a new one."); 
+          setIsLoading(false); 
+          return;
         }
 
         const auth = getAuth(app);
-        // We generate a deterministic, highly secure dummy password so Firebase Auth works passwordlessly!
+        // Deterministic highly secure dummy password
         const secureDummyPassword = `VINTAGE_${email}_SECURE!992026`; 
 
         try {
-          // Try to sign in an existing user
+          // 1. Try to sign in an existing OTP user
           await signInWithEmailAndPassword(auth, email, secureDummyPassword);
-        } catch (signInError) {
-          // If user doesn't exist, create them seamlessly
-          const userCredential = await createUserWithEmailAndPassword(auth, email, secureDummyPassword);
-          await setDoc(doc(db, "users", userCredential.user.uid), {
-            email: email,
-            createdAt: new Date().toISOString()
-          });
+        } catch (signInError: any) {
+          
+          // 2. If sign in fails, attempt to create the user
+          try {
+            const userCredential = await createUserWithEmailAndPassword(auth, email, secureDummyPassword);
+            await setDoc(doc(db, "users", userCredential.user.uid), {
+              email: email,
+              name: email.split('@')[0],
+              createdAt: new Date().toISOString()
+            });
+          } catch (signUpError: any) {
+            // 3. THIS CATCHES THE GOOGLE COLLISION!
+            if (signUpError.code === 'auth/email-already-in-use') {
+              setError("This email is registered via Google. Please use 'Continue with Google' above.");
+            } else {
+              setError(signUpError.message);
+            }
+            setIsLoading(false);
+            return;
+          }
         }
 
         await deleteDoc(doc(db, "otps", email)); // Clean up
@@ -113,6 +133,7 @@ export default function AuthPage() {
         setError("Invalid OTP.");
       }
     } catch (err: any) {
+      console.error("Auth process error:", err);
       setError("Authentication failed.");
     } finally {
       setIsLoading(false);
@@ -149,7 +170,7 @@ export default function AuthPage() {
                   <Mail size={18} className="absolute left-4 top-3.5 text-brand-accent" />
                   <input required type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Enter your email address" className="w-full pl-12 pr-4 py-3 bg-brand-bg border border-brand-secondary focus:border-brand-primary focus:outline-none" />
                 </div>
-                {error && <p className="text-red-500 text-xs font-bold">{error}</p>}
+                {error && <p className="text-red-500 text-xs font-bold bg-red-50 p-2 rounded">{error}</p>}
                 <button type="submit" disabled={isLoading || !email} className="w-full bg-brand-text text-white py-4 text-sm tracking-widest uppercase hover:bg-brand-primary transition-colors flex items-center justify-center">
                   {isLoading ? <Loader2 className="animate-spin" size={18} /> : "Send Login Code"}
                 </button>
@@ -165,7 +186,7 @@ export default function AuthPage() {
                   type="text" maxLength={6} required value={userOtp} onChange={(e) => setUserOtp(e.target.value)}
                   placeholder="••••••" className="w-full py-4 text-center text-2xl tracking-[1em] font-mono bg-brand-bg border border-brand-secondary focus:border-brand-primary focus:outline-none"
                 />
-                {error && <p className="text-red-500 text-xs font-bold">{error}</p>}
+                {error && <p className="text-red-500 text-xs font-bold bg-red-50 p-2 rounded">{error}</p>}
                 <button type="submit" disabled={isLoading || userOtp.length !== 6} className="w-full bg-brand-primary text-white py-4 text-sm tracking-widest uppercase hover:bg-[#A65520] transition-colors flex items-center justify-center">
                   {isLoading ? <Loader2 className="animate-spin" size={18} /> : "Authenticate & Login"}
                 </button>

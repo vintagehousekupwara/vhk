@@ -1,14 +1,14 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { User, Mail, Phone, CalendarHeart, Loader2, LockKeyhole, CheckCircle2 } from "lucide-react";
-import Link from "next/link";
-import Image from "next/image";
-import emailjs from '@emailjs/browser';
-import DatePicker from "react-datepicker";
-import { doc, setDoc, getDoc, deleteDoc, collection, query, where, getDocs } from "firebase/firestore";
+import { useState, useEffect, Suspense, useRef } from "react";
+import { useSearchParams } from "next/navigation";
+import { collection, doc, onSnapshot, query, where, writeBatch, increment } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { CalendarDays, Users, AlertCircle, CheckCircle2, ChevronRight, ChevronLeft, ShieldCheck, Clock, Ban, CheckCircle, Loader2, Mail } from "lucide-react";
+import DatePicker from "react-datepicker";
+import { motion, AnimatePresence } from "framer-motion";
+import Link from "next/link";
+import emailjs from '@emailjs/browser';
 
 const formatYYYYMMDD = (date: Date) => {
   const y = date.getFullYear();
@@ -17,382 +17,510 @@ const formatYYYYMMDD = (date: Date) => {
   return `${y}-${m}-${d}`;
 };
 
-function BookingFormInner() {
-  const [step, setStep] = useState(1);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [availabilityData, setAvailabilityData] = useState<{ isAvailable: boolean, totalCost: number, nights: number } | null>(null);
+const getDatesInRange = (start: Date, end: Date) => {
+  const dates = [];
+  let current = new Date(start);
+  while (current < end) {
+    dates.push(formatYYYYMMDD(current));
+    current.setDate(current.getDate() + 1);
+  }
+  return dates;
+};
 
-  // Dynamic Data States
-  const [liveRooms, setLiveRooms] = useState<any[]>([]);
-  const [inventoryMap, setInventoryMap] = useState<Record<string, number>>({});
+function BookingForm() {
+  const searchParams = useSearchParams();
+  const initialRoomType = searchParams.get("type") || "King Size";
   
-  const [formData, setFormData] = useState({
-    name: "", email: "", phone: "", roomType: "", roomQty: 1, adults: 2, children: 0
-  });
-  
-  const [checkIn, setCheckIn] = useState<Date | null>(null);
-  const [checkOut, setCheckOut] = useState<Date | null>(null);
-  const [userOtp, setUserOtp] = useState("");
+  // Ref for auto-scrolling to the top of the form on step change
+  const formTopRef = useRef<HTMLDivElement>(null);
 
-  // 1. Fetch Room Categories & Base Prices on Load
+  const [step, setStep] = useState<1 | 2 | 3>(1);
+
+  const [roomType, setRoomType] = useState(initialRoomType);
+  const [checkInDate, setCheckInDate] = useState<Date>(new Date());
+  const [checkOutDate, setCheckOutDate] = useState<Date>(new Date(Date.now() + 86400000));
+  const [adults, setAdults] = useState(1);
+  const [children, setChildren] = useState(0);
+
+  const [guestDetails, setGuestDetails] = useState({ name: "", email: "", phone: "", requests: "" });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // EmailJS & OTP States
+  const [otpSent, setOtpSent] = useState(false);
+  const [enteredOtp, setEnteredOtp] = useState("");
+  const [generatedOtp, setGeneratedOtp] = useState("");
+  const [isEmailVerified, setIsEmailVerified] = useState(false);
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  
+  // Resend Timer & Limits
+  const [timer, setTimer] = useState(0);
+  const [resendCount, setResendCount] = useState(0);
+
+  const [globalPricing, setGlobalPricing] = useState({ kingSize: 5000, doubleBed: 3500, childCharge: 500 });
+  const [availabilityStatus, setAvailabilityStatus] = useState<'loading' | 'available' | 'unavailable'>('loading');
+  const [availableRooms, setAvailableRooms] = useState<number>(0);
+
+  // Auto-scroll to top when step changes
   useEffect(() => {
-    const fetchRooms = async () => {
-      try {
-        const snap = await getDocs(collection(db, "rooms"));
-        const roomsData = snap.docs.map(d => ({ id: d.id, ...d.data() } as any));
-        setLiveRooms(roomsData);
-        if (roomsData.length > 0) {
-          setFormData(prev => ({ ...prev, roomType: roomsData[0].name }));
-        }
-      } catch (error) {
-        console.error("Failed to load rooms.");
+    if (formTopRef.current) {
+      const yOffset = -100; // Offset for fixed navbar
+      const y = formTopRef.current.getBoundingClientRect().top + window.pageYOffset + yOffset;
+      window.scrollTo({ top: y, behavior: 'smooth' });
+    }
+  }, [step]);
+
+  // Auto-fix checkout date
+  useEffect(() => {
+    if (checkInDate >= checkOutDate) {
+      const nextDay = new Date(checkInDate);
+      nextDay.setDate(nextDay.getDate() + 1);
+      setCheckOutDate(nextDay);
+    }
+  }, [checkInDate, checkOutDate]);
+
+  // Handle 45-second countdown timer
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (timer > 0) {
+      interval = setInterval(() => {
+        setTimer((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [timer]);
+
+  const numberOfNights = Math.max(1, Math.round((checkOutDate.getTime() - checkInDate.getTime()) / 86400000));
+  const baseRate = roomType === "King Size" ? globalPricing.kingSize : globalPricing.doubleBed;
+  const extraChildrenCost = children * globalPricing.childCharge;
+  const costPerNight = baseRate + extraChildrenCost;
+  const totalCost = costPerNight * numberOfNights;
+
+  useEffect(() => {
+    const unsubPricing = onSnapshot(doc(db, "settings", "global_pricing"), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data() as any;
+        setGlobalPricing({
+          kingSize: data.kingSize || 5000,
+          doubleBed: data.doubleBed || 3500,
+          childCharge: data.childCharge || 500
+        });
       }
-    };
-    fetchRooms();
+    });
+    return () => unsubPricing();
   }, []);
 
-  // 2. Fetch Live Inventory whenever Room Type changes
   useEffect(() => {
-    if (!formData.roomType) return;
-    const fetchLiveInventory = async () => {
-      try {
-        const todayStr = formatYYYYMMDD(new Date());
-        const q = query(collection(db, "room_inventory"), 
-          where("roomType", "==", formData.roomType),
-          where("date", ">=", todayStr)
-        );
-        const snap = await getDocs(q);
-        const newMap: Record<string, number> = {};
-        snap.docs.forEach(doc => { 
-          newMap[doc.data().date] = doc.data().available; 
-        });
-        setInventoryMap(newMap);
-      } catch (error) {
-        console.error("Failed to load calendar data.");
-      }
-    };
-    fetchLiveInventory();
-    
-    setCheckIn(null); setCheckOut(null); setAvailabilityData(null);
-  }, [formData.roomType]);
+    setAvailabilityStatus('loading');
+    const startStr = formatYYYYMMDD(checkInDate);
+    const endStr = formatYYYYMMDD(checkOutDate);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-    setAvailabilityData(null);
-  };
+    const q = query(collection(db, "room_inventory"), 
+      where("roomType", "==", roomType),
+      where("date", ">=", startStr),
+      where("date", "<", endStr)
+    );
 
-  // Paint the visual calendar (Green = Available, Red = Sold Out)
-  const getDayClassName = (date: Date) => {
-    const dateStr = formatYYYYMMDD(date);
-    const available = inventoryMap[dateStr] || 0;
-    
-    if (date < new Date(new Date().setHours(0,0,0,0))) return ""; 
-    
-    return available >= formData.roomQty 
-      ? "!bg-green-100 !text-green-800 !font-bold rounded-sm border border-green-300" 
-      : "!bg-red-100 !text-red-500 !opacity-50 cursor-not-allowed line-through";
-  };
-
-  // Prevent users from selecting red (sold out) dates
-  const isDateSelectable = (date: Date) => {
-    const dateStr = formatYYYYMMDD(date);
-    const available = inventoryMap[dateStr] || 0;
-    return available >= formData.roomQty;
-  };
-
-  const checkAvailability = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!checkIn || !checkOut) return setError("Please select check-in and check-out dates.");
-    if (checkIn >= checkOut) return setError("Check-out must be after check-in.");
-    
-    setIsLoading(true); setError(""); setAvailabilityData(null);
-
-    try {
-      let currentDate = new Date(checkIn);
-      const end = new Date(checkOut);
-      let nights = 0;
-      let allAvailable = true;
-
-      while (currentDate < end) {
-        const dateStr = formatYYYYMMDD(currentDate);
-        const available = inventoryMap[dateStr] || 0;
-        
-        if (available < formData.roomQty) {
-          allAvailable = false; break;
-        }
-        nights++;
-        currentDate.setDate(currentDate.getDate() + 1);
+    const unsubInventory = onSnapshot(q, (snap) => {
+      if (snap.empty || snap.docs.length < numberOfNights) {
+        setAvailabilityStatus('unavailable');
+        setAvailableRooms(0);
+        return;
       }
 
-      if (!allAvailable) {
-        setError("One or more selected dates do not have enough rooms available.");
+      let minAvailable = Infinity;
+      snap.docs.forEach(doc => {
+        const data = doc.data();
+        if (data.available < minAvailable) minAvailable = data.available;
+      });
+
+      if (minAvailable > 0) {
+        setAvailabilityStatus('available');
+        setAvailableRooms(minAvailable);
       } else {
-        // DYNAMIC PRICING CALCULATION
-        const selectedRoom = liveRooms.find(r => r.name === formData.roomType);
-        const roomBasePrice = selectedRoom ? Number(selectedRoom.price) : 0;
-        const childBasePrice = selectedRoom?.childPrice ? Number(selectedRoom.childPrice) : 1000; // Fallback if admin didn't set child price in DB
-
-        const roomNightlyTotal = roomBasePrice * formData.roomQty;
-        const childNightlyTotal = childBasePrice * formData.children;
-        const totalCost = (roomNightlyTotal + childNightlyTotal) * nights;
-
-        setAvailabilityData({ isAvailable: true, totalCost, nights });
+        setAvailabilityStatus('unavailable');
+        setAvailableRooms(0);
       }
-    } catch (err) {
-      setError("Error checking availability.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    });
 
+    return () => unsubInventory();
+  }, [checkInDate, checkOutDate, roomType, numberOfNights]);
+
+  // Handle OTP Sending via EmailJS
   const handleSendOTP = async () => {
-    if (!process.env.NEXT_PUBLIC_EMAILJS_SERVICE_ID) return setError("Email service misconfigured.");
-    setIsLoading(true); setError("");
+    if (!guestDetails.email || !guestDetails.name) {
+      alert("Please enter your name and email first.");
+      return;
+    }
+    if (resendCount >= 10) {
+      alert("Maximum OTP resend limit (10) reached for this session.");
+      return;
+    }
+    
+    setIsSendingOtp(true);
+    const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    setGeneratedOtp(newOtp);
 
     try {
-      const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
-      const expiry = new Date(new Date().getTime() + 15 * 60000); 
-
-      await setDoc(doc(db, "otps", formData.email), { otp: generatedOtp, expiresAt: expiry.toISOString() });
       await emailjs.send(
-        process.env.NEXT_PUBLIC_EMAILJS_SERVICE_ID,
-        process.env.NEXT_PUBLIC_EMAILJS_TEMPLATE_ID!,
-        { to_email: formData.email, passcode: generatedOtp, time: expiry.toLocaleTimeString() },
-        process.env.NEXT_PUBLIC_EMAILJS_PUBLIC_KEY!
+        process.env.NEXT_PUBLIC_EMAILJS_SERVICE_ID as string, 
+        process.env.NEXT_PUBLIC_EMAILJS_TEMPLATE_ID as string, 
+        {
+          to_name: guestDetails.name,
+          to_email: guestDetails.email,
+          otp_code: newOtp,
+          message: newOtp,
+          passcode: newOtp
+        }, 
+        process.env.NEXT_PUBLIC_EMAILJS_PUBLIC_KEY as string
       );
-      setStep(2); 
-    } catch (err) {
-      setError("Failed to send OTP.");
+      
+      setOtpSent(true);
+      setResendCount(prev => prev + 1);
+      setTimer(45); // Start the 45-second cooldown
+    } catch (error) {
+      console.error("EmailJS Error", error);
+      alert("Failed to send verification email. Please check your EmailJS configuration.");
     } finally {
-      setIsLoading(false);
+      setIsSendingOtp(false);
     }
   };
 
-  const handleVerifyOTP = async (e: React.FormEvent) => {
+  const handleVerifyOTP = () => {
+    if (enteredOtp === generatedOtp) {
+      setIsEmailVerified(true);
+    } else {
+      alert("Incorrect verification code. Please try again.");
+    }
+  };
+
+  const confirmBookingRequest = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true); setError("");
+    if (!isEmailVerified) {
+      alert("Please verify your email before submitting.");
+      return;
+    }
+    if (availabilityStatus !== 'available' || availableRooms <= 0) return;
+    setIsSubmitting(true);
 
     try {
-      const otpDoc = await getDoc(doc(db, "otps", formData.email));
-      
-      if (otpDoc.exists() && otpDoc.data().otp === userOtp) {
-        if (new Date() > new Date(otpDoc.data().expiresAt)) {
-          setError("OTP expired."); setIsLoading(false); return;
-        }
+      const batch = writeBatch(db);
 
-        await setDoc(doc(collection(db, "room_requests")), {
-          ...formData,
-          checkIn: checkIn?.toISOString(),
-          checkOut: checkOut?.toISOString(),
-          totalCost: availabilityData?.totalCost,
-          nights: availabilityData?.nights,
-          status: "Pending",
-          createdAt: new Date().toISOString()
-        });
+      const newBookingRef = doc(collection(db, "bookings"));
+      batch.set(newBookingRef, {
+        customerName: guestDetails.name,
+        email: guestDetails.email,
+        phone: guestDetails.phone,
+        specialRequests: guestDetails.requests,
+        roomType,
+        checkIn: formatYYYYMMDD(checkInDate),
+        checkOut: formatYYYYMMDD(checkOutDate),
+        nights: numberOfNights,
+        adults,
+        children,
+        totalCost,
+        status: "pending", 
+        createdAt: new Date().toISOString()
+      });
 
-        // Deduct Inventory in Firebase
-        let currentDate = new Date(checkIn!);
-        const end = new Date(checkOut!);
-        while (currentDate < end) {
-          const dateString = formatYYYYMMDD(currentDate);
-          const docId = `${formData.roomType}_${dateString}`;
-          const currentAvailable = inventoryMap[dateString] || 0;
-          
-          await setDoc(doc(db, "room_inventory", docId), {
-            available: currentAvailable - formData.roomQty
-          }, { merge: true });
-          
-          currentDate.setDate(currentDate.getDate() + 1);
-        }
+      const datesToBook = getDatesInRange(checkInDate, checkOutDate);
+      datesToBook.forEach(dateStr => {
+        const invRef = doc(db, "room_inventory", `${roomType}_${dateStr}`);
+        batch.update(invRef, { available: increment(-1) });
+      });
 
-        await deleteDoc(doc(db, "otps", formData.email));
-        setStep(3);
-      } else {
-        setError("Invalid OTP.");
-      }
-    } catch (err) {
-      setError("An error occurred. Please try again.");
+      await batch.commit();
+      setStep(3);
+    } catch (error) {
+      console.error("Booking Error", error);
+      alert("Something went wrong with your booking request. Please try again.");
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <AnimatePresence mode="wait">
-      {step === 1 && (
-        <motion.div key="step1" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="w-full">
-          <div className="mb-8">
-            <span className="text-brand-primary tracking-widest uppercase text-xs font-bold mb-2 block">Reservation Request</span>
-            <h1 className="font-serif text-4xl text-brand-text mb-3">Live Availability</h1>
-            <p className="text-brand-muted text-sm leading-relaxed">
-              Green dates are available. Red dates are sold out.
-            </p>
-          </div>
-
-          <style dangerouslySetInnerHTML={{__html: `
-            .react-datepicker__day--disabled { opacity: 0.5; }
-          `}} />
-
-          <form onSubmit={checkAvailability} className="space-y-4">
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 border border-gray-200 rounded-lg">
-              <div className="relative">
-                <label className="text-xs font-bold uppercase tracking-wider text-brand-text mb-2 block">Room Category</label>
-                {liveRooms.length === 0 ? (
-                  <div className="w-full px-4 py-3 bg-white border border-gray-200 text-gray-500 font-bold text-sm">Loading...</div>
-                ) : (
-                  <select name="roomType" value={formData.roomType} onChange={handleInputChange} className="w-full px-4 py-3 bg-white border border-gray-200 focus:outline-none focus:border-brand-primary font-bold text-gray-800">
-                    {liveRooms.map(room => (
-                      <option key={room.id} value={room.name}>{room.name} (₹{room.price} / night)</option>
-                    ))}
-                  </select>
-                )}
+    <div className="max-w-5xl mx-auto pb-24" ref={formTopRef}>
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-xl overflow-hidden mb-12">
+        <AnimatePresence mode="wait">
+          
+          {/* STEP 1: DATE & ROOM SELECTION */}
+          {step === 1 && (
+            <motion.div key="step1" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="p-6 md:p-10">
+              <div className="mb-8 border-b border-gray-100 pb-6">
+                <h1 className="font-serif text-3xl md:text-4xl text-brand-text mb-2">Reserve Your Stay</h1>
+                <p className="text-gray-500">Select your dates. Availability updates in real-time across your entire stay.</p>
               </div>
-              <div className="relative">
-                <label className="text-xs font-bold uppercase tracking-wider text-brand-text mb-2 block">Number of Rooms</label>
-                <input required type="number" name="roomQty" min="1" max="10" value={formData.roomQty} onChange={handleInputChange} className="w-full px-4 py-3 bg-white border border-gray-200 focus:outline-none focus:border-brand-primary font-bold text-gray-800" />
-              </div>
-            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="relative">
-                <label className="text-xs font-bold uppercase tracking-wider text-brand-text mb-2 block">Adults</label>
-                <input required type="number" name="adults" min="1" value={formData.adults} onChange={handleInputChange} className="w-full px-4 py-3 bg-brand-bg border border-brand-secondary focus:outline-none" />
-              </div>
-              <div className="relative">
-                <label className="text-xs font-bold uppercase tracking-wider text-brand-text mb-2 block">Children (Additional Charge)</label>
-                <input required type="number" name="children" min="0" value={formData.children} onChange={handleInputChange} className="w-full px-4 py-3 bg-brand-bg border border-brand-secondary focus:outline-none" />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-              <div className="relative">
-                <label className="text-xs font-bold uppercase tracking-wider text-brand-text mb-2 block flex items-center gap-2">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div> Check-In
-                </label>
-                <div className="relative flex items-center">
-                  <CalendarHeart size={18} className="absolute left-4 text-brand-accent z-10" />
-                  <DatePicker 
-                    selected={checkIn} onChange={(d: Date | null) => { setCheckIn(d); setAvailabilityData(null); }} 
-                    selectsStart startDate={checkIn} endDate={checkOut} minDate={new Date()} 
-                    dayClassName={getDayClassName} filterDate={isDateSelectable}
-                    placeholderText="Select Date" className="w-full pl-12 pr-4 py-3 bg-brand-bg border border-brand-secondary focus:border-brand-primary focus:outline-none cursor-pointer" wrapperClassName="w-full" 
-                  />
-                </div>
-              </div>
-              <div className="relative">
-                <label className="text-xs font-bold uppercase tracking-wider text-brand-text mb-2 block flex items-center gap-2">
-                  <div className="w-2 h-2 bg-red-400 rounded-full"></div> Check-Out
-                </label>
-                <div className="relative flex items-center">
-                  <CalendarHeart size={18} className="absolute left-4 text-brand-accent z-10" />
-                  <DatePicker 
-                    selected={checkOut} onChange={(d: Date | null) => { setCheckOut(d); setAvailabilityData(null); }} 
-                    selectsEnd startDate={checkIn} endDate={checkOut} minDate={checkIn || new Date()} 
-                    dayClassName={getDayClassName} filterDate={isDateSelectable}
-                    placeholderText="Select Date" className="w-full pl-12 pr-4 py-3 bg-brand-bg border border-brand-secondary focus:border-brand-primary focus:outline-none cursor-pointer" wrapperClassName="w-full" 
-                  />
-                </div>
-              </div>
-            </div>
-
-            {error && <p className="text-red-500 text-xs font-bold pt-2">{error}</p>}
-
-            {!availabilityData ? (
-              <button type="submit" disabled={isLoading} className="w-full mt-6 bg-brand-text text-white py-4 text-sm tracking-widest uppercase hover:bg-brand-primary transition-colors flex items-center justify-center">
-                {isLoading ? <Loader2 className="animate-spin" size={18} /> : "Calculate Total"}
-              </button>
-            ) : (
-              <div className="mt-8 border-t border-brand-secondary pt-6 space-y-4 animate-in fade-in slide-in-from-bottom-4">
-                <div className="bg-green-50 border border-green-200 p-4 rounded-lg flex justify-between items-center mb-6">
+              <div className="grid grid-cols-1 md:grid-cols-[1fr_400px] gap-8 lg:gap-12">
+                <div className="space-y-6">
                   <div>
-                    <p className="text-green-800 font-bold uppercase tracking-wider text-xs flex items-center gap-2"><CheckCircle2 size={16}/> Dates Verified</p>
-                    <p className="text-sm text-green-700 mt-1">{availabilityData.nights} Nights • {formData.roomQty} {formData.roomType} • {formData.children} Child(ren)</p>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Room Category</label>
+                    <select value={roomType} onChange={(e) => setRoomType(e.target.value)} className="w-full px-4 py-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-primary/50 text-gray-800 font-bold text-lg hover:border-brand-primary/50 transition-colors">
+                      <option value="King Size">King Size Suite</option>
+                      <option value="Double Bed">Double Bed Room</option>
+                    </select>
                   </div>
-                  <div className="text-right">
-                    <p className="text-xs text-green-600 uppercase tracking-widest font-bold">Total Cost</p>
-                    <p className="text-2xl font-bold text-green-800">₹{availabilityData.totalCost.toLocaleString()}</p>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2 flex items-center gap-2">Check-In</label>
+                      <div className="border border-gray-200 rounded-xl overflow-hidden bg-gray-50 hover:border-brand-primary/50 transition-colors">
+                        <DatePicker selected={checkInDate} onChange={(date: Date | null) => date && setCheckInDate(date)} minDate={new Date()} className="w-full px-4 py-4 bg-transparent outline-none text-gray-800 font-bold cursor-pointer" dateFormat="MMM d, yyyy" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2 flex items-center gap-2">Check-Out</label>
+                      <div className="border border-gray-200 rounded-xl overflow-hidden bg-gray-50 hover:border-brand-primary/50 transition-colors">
+                        <DatePicker selected={checkOutDate} onChange={(date: Date | null) => date && setCheckOutDate(date)} minDate={new Date(checkInDate.getTime() + 86400000)} className="w-full px-4 py-4 bg-transparent outline-none text-gray-800 font-bold cursor-pointer" dateFormat="MMM d, yyyy" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Adults</label>
+                      <input type="number" min="1" max="4" value={adults} onChange={(e) => setAdults(Number(e.target.value))} className="w-full px-4 py-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-primary/50 text-gray-800 font-bold hover:border-brand-primary/50 transition-colors" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Children</label>
+                      <input type="number" min="0" max="4" value={children} onChange={(e) => setChildren(Number(e.target.value))} className="w-full px-4 py-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-primary/50 text-gray-800 font-bold hover:border-brand-primary/50 transition-colors" />
+                    </div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="relative">
-                    <User size={18} className="absolute left-4 top-3.5 text-brand-accent" />
-                    <input required type="text" name="name" value={formData.name} onChange={handleInputChange} placeholder="Full Name" className="w-full pl-12 pr-4 py-3 bg-white border border-brand-secondary focus:outline-none" />
+                <div className="bg-gray-50 p-6 md:p-8 rounded-2xl border border-gray-200 flex flex-col h-full">
+                  <h3 className="font-serif text-xl text-gray-800 mb-6 border-b border-gray-200 pb-4">Booking Summary</h3>
+                  <div className="space-y-3 flex-grow text-sm">
+                    <div className="flex justify-between text-gray-600"><span>Rate ({numberOfNights} {numberOfNights === 1 ? 'Night' : 'Nights'})</span><span className="font-bold text-gray-800">₹{baseRate * numberOfNights}</span></div>
+                    {children > 0 && <div className="flex justify-between text-gray-600"><span>Children Extra ({children})</span><span className="font-bold text-gray-800">+₹{extraChildrenCost * numberOfNights}</span></div>}
+                    <div className="pt-4 mt-4 border-t border-gray-200 flex justify-between items-end"><span className="font-bold text-gray-800 uppercase tracking-widest text-xs">Total Amount</span><span className="font-serif text-3xl font-bold text-brand-primary">₹{totalCost}</span></div>
                   </div>
-                  <div className="relative">
-                    <Phone size={18} className="absolute left-4 top-3.5 text-brand-accent" />
-                    <input required type="tel" name="phone" value={formData.phone} onChange={handleInputChange} placeholder="Phone" className="w-full pl-12 pr-4 py-3 bg-white border border-brand-secondary focus:outline-none" />
+
+                  <div className="mt-8 mb-6">
+                    {availabilityStatus === 'loading' ? <div className="flex items-center gap-2 text-gray-500 text-sm"><Loader2 className="w-5 h-5 animate-spin" /> Checking dates...</div> : availabilityStatus === 'available' ? <div className="flex items-center gap-2 text-green-700 bg-green-50 p-4 rounded-xl border border-green-200"><CheckCircle2 size={20} className="shrink-0" /><span className="font-bold text-sm">Available! {availableRooms} rooms left.</span></div> : <div className="flex items-center gap-2 text-red-700 bg-red-50 p-4 rounded-xl border border-red-200"><AlertCircle size={20} className="shrink-0" /><span className="font-bold text-sm">Unavailable. Room sold out during this period.</span></div>}
                   </div>
+
+                  <motion.button 
+                    whileHover={{ scale: availabilityStatus === 'available' ? 1.02 : 1 }}
+                    whileTap={{ scale: availabilityStatus === 'available' ? 0.98 : 1 }}
+                    onClick={() => setStep(2)} 
+                    disabled={availabilityStatus !== 'available'} 
+                    className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold tracking-widest uppercase hover:bg-slate-800 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Proceed to Guest Details <ChevronRight size={18} />
+                  </motion.button>
                 </div>
-                <div className="relative mb-4">
-                  <Mail size={18} className="absolute left-4 top-3.5 text-brand-accent" />
-                  <input required type="email" name="email" value={formData.email} onChange={handleInputChange} placeholder="Email (For Verification)" className="w-full pl-12 pr-4 py-3 bg-white border border-brand-secondary focus:outline-none" />
-                </div>
-                
-                <button type="button" onClick={handleSendOTP} disabled={isLoading || !formData.email || !formData.name} className="w-full bg-brand-primary text-white py-4 text-sm tracking-widest uppercase hover:bg-[#A65520] transition-colors flex items-center justify-center shadow-luxury">
-                  {isLoading ? <Loader2 className="animate-spin" size={18} /> : "Verify & Book"}
-                </button>
               </div>
-            )}
-          </form>
-        </motion.div>
-      )}
+            </motion.div>
+          )}
 
-      {/* STEP 2: OTP */}
-      {step === 2 && (
-        <motion.div key="step2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="w-full flex flex-col items-center text-center py-10">
-          <div className="w-16 h-16 bg-brand-secondary/50 rounded-full flex items-center justify-center mb-6 text-brand-primary">
-            <LockKeyhole size={32} />
+          {/* STEP 2: GUEST DETAILS & EMAIL VERIFICATION */}
+          {step === 2 && (
+            <motion.div key="step2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="p-6 md:p-10">
+              <button onClick={() => setStep(1)} className="flex items-center gap-2 text-sm font-bold text-gray-500 hover:text-brand-primary uppercase tracking-widest mb-8 transition-colors">
+                <ChevronLeft size={16} /> Back to Selection
+              </button>
+
+              <div className="grid grid-cols-1 md:grid-cols-[1fr_400px] gap-8 lg:gap-12">
+                
+                <div className="space-y-5">
+                  <h2 className="font-serif text-3xl text-gray-800 mb-6">Guest Information</h2>
+                  
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Full Name</label>
+                    <input required disabled={isEmailVerified} type="text" value={guestDetails.name} onChange={e => setGuestDetails({...guestDetails, name: e.target.value})} className="w-full px-4 py-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-brand-primary text-gray-800 font-medium hover:border-brand-primary/50 transition-colors" placeholder="John Doe" />
+                  </div>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Email</label>
+                      <input required disabled={isEmailVerified} type="email" value={guestDetails.email} onChange={e => setGuestDetails({...guestDetails, email: e.target.value})} className="w-full px-4 py-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-brand-primary text-gray-800 font-medium hover:border-brand-primary/50 transition-colors" placeholder="john@example.com" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Phone Number</label>
+                      <input required disabled={isEmailVerified} type="tel" value={guestDetails.phone} onChange={e => setGuestDetails({...guestDetails, phone: e.target.value})} className="w-full px-4 py-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-brand-primary text-gray-800 font-medium hover:border-brand-primary/50 transition-colors" placeholder="+91 98765 43210" />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Special Requests (Optional)</label>
+                    <textarea disabled={isEmailVerified} value={guestDetails.requests} onChange={e => setGuestDetails({...guestDetails, requests: e.target.value})} className="w-full px-4 py-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-brand-primary text-gray-800 font-medium h-24 resize-none hover:border-brand-primary/50 transition-colors" placeholder="Late arrival, extra pillows, etc." />
+                  </div>
+
+                  {/* Email Verification Block */}
+                  <div className="p-6 border border-brand-primary/30 bg-brand-primary/5 rounded-xl mt-6">
+                    <h3 className="font-bold text-gray-800 text-sm uppercase tracking-widest mb-4 flex items-center gap-2"><Mail size={18} className="text-brand-primary"/> Verify Email Address</h3>
+                    
+                    {!isEmailVerified ? (
+                      <div className="space-y-4">
+                        {!otpSent ? (
+                          <motion.button 
+                            whileHover={{ scale: isSendingOtp ? 1 : 1.02 }}
+                            whileTap={{ scale: isSendingOtp ? 1 : 0.98 }}
+                            type="button" 
+                            onClick={handleSendOTP} 
+                            disabled={isSendingOtp} 
+                            className="w-full md:w-auto bg-brand-text text-white px-6 py-3 rounded-lg font-bold text-sm tracking-widest uppercase hover:bg-brand-primary transition-colors flex items-center justify-center gap-2 disabled:opacity-70"
+                          >
+                            {isSendingOtp ? <><Loader2 className="animate-spin w-4 h-4" /> Sending...</> : "Send Verification Code"}
+                          </motion.button>
+                        ) : (
+                          <div className="flex flex-col gap-4">
+                            <div className="flex flex-col sm:flex-row gap-4">
+                              <input type="text" placeholder="Enter 6-digit code" value={enteredOtp} onChange={e => setEnteredOtp(e.target.value)} className="px-4 py-3 bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-brand-primary text-gray-800 font-medium text-center tracking-widest flex-grow" maxLength={6} />
+                              <motion.button 
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
+                                type="button" 
+                                onClick={handleVerifyOTP} 
+                                className="bg-brand-primary text-white px-6 py-3 rounded-lg font-bold text-sm tracking-widest uppercase hover:bg-[#A65520] transition-colors whitespace-nowrap shadow-sm"
+                              >
+                                Verify Code
+                              </motion.button>
+                            </div>
+                            
+                            {/* Resend OTP Logic */}
+                            <div className="flex justify-center mt-2">
+                              {resendCount >= 10 ? (
+                                <span className="text-red-500 text-xs font-bold bg-red-50 px-3 py-1 rounded">Max attempts reached. Contact support.</span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={handleSendOTP}
+                                  disabled={timer > 0 || isSendingOtp}
+                                  className="text-xs font-bold text-gray-500 hover:text-brand-primary uppercase tracking-widest transition-colors disabled:opacity-40 disabled:hover:text-gray-500"
+                                >
+                                  {timer > 0 ? `Resend Code in ${timer}s` : isSendingOtp ? "Sending..." : "Didn't receive it? Resend Code"}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <motion.div 
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="flex items-center gap-2 text-green-700 font-bold bg-green-100 p-3 rounded-lg"
+                      >
+                        <CheckCircle2 size={20} /> Email Successfully Verified!
+                      </motion.div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="bg-brand-bg/50 p-6 rounded-2xl border border-brand-secondary/50 h-fit">
+                  <h3 className="font-bold text-gray-800 text-sm uppercase tracking-widest mb-4 border-b border-brand-secondary pb-4">Your Reservation</h3>
+                  <div className="space-y-3 mb-6">
+                    <div><span className="text-xs text-gray-500 block uppercase">Room</span><span className="font-serif font-bold text-brand-text">{roomType}</span></div>
+                    <div><span className="text-xs text-gray-500 block uppercase">Check-In</span><span className="font-bold text-sm text-gray-800">{checkInDate.toLocaleDateString()}</span></div>
+                    <div><span className="text-xs text-gray-500 block uppercase">Check-Out</span><span className="font-bold text-sm text-gray-800">{checkOutDate.toLocaleDateString()}</span></div>
+                  </div>
+                  <div className="pt-4 border-t border-brand-secondary flex justify-between items-end mb-6">
+                    <span className="font-bold text-gray-800 uppercase tracking-widest text-xs">Total Pay at Hotel</span>
+                    <span className="font-serif text-2xl font-bold text-brand-primary">₹{totalCost}</span>
+                  </div>
+                  
+                  <motion.button 
+                    whileHover={{ scale: (!isEmailVerified || isSubmitting) ? 1 : 1.02 }}
+                    whileTap={{ scale: (!isEmailVerified || isSubmitting) ? 1 : 0.98 }}
+                    onClick={confirmBookingRequest}
+                    disabled={!isEmailVerified || isSubmitting}
+                    className="w-full bg-brand-primary text-white py-4 rounded-xl font-bold tracking-widest uppercase hover:bg-[#A65520] transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
+                  >
+                    {isSubmitting ? <><Loader2 className="animate-spin w-5 h-5" /> Processing Request...</> : <><CheckCircle2 size={18} /> Send Booking Request</>}
+                  </motion.button>
+                  
+                  {!isEmailVerified && <p className="text-xs text-center text-red-500 mt-3 font-medium">You must verify your email first.</p>}
+                </div>
+
+              </div>
+            </motion.div>
+          )}
+
+          {/* STEP 3: SUCCESS CONFIRMATION */}
+          {step === 3 && (
+            <motion.div key="step3" initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} className="p-12 md:p-20 text-center flex flex-col items-center">
+              <motion.div 
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: "spring", stiffness: 200, damping: 15, delay: 0.2 }}
+                className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mb-6 shadow-inner"
+              >
+                <CheckCircle className="w-10 h-10 text-blue-600" />
+              </motion.div>
+              <h1 className="font-serif text-4xl text-brand-text mb-4">Request Sent Successfully!</h1>
+              <p className="text-gray-600 max-w-md mx-auto mb-8 leading-relaxed">
+                Thank you, {guestDetails.name}! Your request for the {roomType} from {checkInDate.toLocaleDateString()} to {checkOutDate.toLocaleDateString()} has been sent to our admin team. 
+                <br/><br/>
+                We will review your request and contact you at <strong>{guestDetails.email}</strong> regarding payment to finalize your confirmation.
+              </p>
+              <Link href="/">
+                <motion.button 
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="bg-slate-900 text-white px-8 py-4 rounded-xl font-bold tracking-widest uppercase hover:bg-slate-800 transition-colors shadow-md"
+                >
+                  Return to Home
+                </motion.button>
+              </Link>
+            </motion.div>
+          )}
+
+        </AnimatePresence>
+      </div>
+
+      {/* Hotel Rules Section */}
+      <div className="bg-white p-6 md:p-10 rounded-2xl border border-gray-200 shadow-sm">
+        <div className="flex items-center gap-3 mb-8">
+          <ShieldCheck className="text-brand-primary w-6 h-6 md:w-8 md:h-8" />
+          <h2 className="font-serif text-2xl md:text-3xl text-gray-800">Hotel Rules & Policies</h2>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12">
+          <div className="space-y-6">
+            <div className="flex items-start gap-4">
+              <Clock className="text-brand-secondary shrink-0 mt-1" size={24} />
+              <div>
+                <h4 className="font-bold text-gray-800 text-sm uppercase tracking-widest">Check-in / Check-out</h4>
+                <p className="text-sm text-gray-600 mt-2 leading-relaxed">Check-in time is strictly from <strong>2:00 PM</strong> onwards. Check-out must be completed by <strong>11:00 AM</strong>.</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-4">
+              <Users className="text-brand-secondary shrink-0 mt-1" size={24} />
+              <div>
+                <h4 className="font-bold text-gray-800 text-sm uppercase tracking-widest">Identification</h4>
+                <p className="text-sm text-gray-600 mt-2 leading-relaxed">A valid Government-issued ID (Aadhaar, Passport, or Driving License) is mandatory for all guests at the time of check-in.</p>
+              </div>
+            </div>
           </div>
-          <h2 className="font-serif text-3xl text-brand-text mb-2">Verify Your Email</h2>
-          <p className="text-brand-muted text-sm mb-8">Enter the 6-digit code sent to <span className="font-bold text-gray-800">{formData.email}</span></p>
-
-          <form onSubmit={handleVerifyOTP} className="w-full max-w-sm space-y-6">
-            <input type="text" maxLength={6} value={userOtp} onChange={(e) => setUserOtp(e.target.value)} placeholder="••••••" className="w-full py-4 text-center text-2xl tracking-[1em] font-mono bg-brand-bg border border-brand-secondary focus:outline-none" />
-            {error && <p className="text-red-500 text-xs font-bold">{error}</p>}
-            <button type="submit" disabled={isLoading || userOtp.length !== 6} className="w-full bg-brand-text text-white py-4 text-sm tracking-widest uppercase hover:bg-brand-primary flex items-center justify-center">
-              {isLoading ? <Loader2 className="animate-spin" size={18} /> : "Confirm Booking"}
-            </button>
-          </form>
-        </motion.div>
-      )}
-
-      {/* STEP 3: SUCCESS */}
-      {step === 3 && (
-        <motion.div key="step3" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="w-full flex flex-col items-center justify-center text-center py-10">
-          <div className="w-24 h-24 bg-green-50 rounded-full flex items-center justify-center mb-4">
-            <CheckCircle2 size={50} className="text-green-600" />
+          <div className="space-y-6">
+            <div className="flex items-start gap-4">
+              <Ban className="text-red-400 shrink-0 mt-1" size={24} />
+              <div>
+                <h4 className="font-bold text-gray-800 text-sm uppercase tracking-widest">No Smoking</h4>
+                <p className="text-sm text-gray-600 mt-2 leading-relaxed">Smoking is strictly prohibited inside the rooms and corridors. Dedicated smoking zones are available outside.</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-4">
+              <Ban className="text-red-400 shrink-0 mt-1" size={24} />
+              <div>
+                <h4 className="font-bold text-gray-800 text-sm uppercase tracking-widest">Pet Policy</h4>
+                <p className="text-sm text-gray-600 mt-2 leading-relaxed">To ensure the comfort of all our guests and maintain our facilities, pets are currently not allowed on the hotel premises.</p>
+              </div>
+            </div>
           </div>
-          <h2 className="font-serif text-4xl text-brand-text mb-2">Booking Reserved!</h2>
-          <p className="text-brand-muted max-w-md mx-auto leading-relaxed mb-6">
-            Thank you, {formData.name}. Your request for {formData.roomQty}x {formData.roomType} has been securely locked in.
-          </p>
-          <Link href="/auth">
-            <button className="border-b-2 border-brand-primary text-brand-primary pb-1 uppercase tracking-widest text-sm font-bold flex items-center gap-2 hover:gap-4 transition-all">
-              Track in Guest Portal
-            </button>
-          </Link>
-        </motion.div>
-      )}
-    </AnimatePresence>
+        </div>
+      </div>
+    </div>
   );
 }
 
-export default function BookingPage() {
+export default function BookPage() {
   return (
-    <main className="min-h-screen bg-brand-bg flex items-center justify-center py-12 px-4 md:px-6 lg:px-24 pt-24">
-      <div className="max-w-7xl w-full bg-white shadow-floating border border-brand-secondary flex flex-col-reverse lg:flex-row overflow-hidden">
-        <div className="w-full lg:w-3/5 p-6 md:p-10 lg:p-16 relative min-h-[600px] flex items-center">
-          <Suspense fallback={<div className="flex items-center justify-center w-full h-full text-brand-muted"><Loader2 className="animate-spin" /></div>}>
-            <BookingFormInner />
-          </Suspense>
-        </div>
-        <div className="w-full lg:w-2/5 relative min-h-[300px] lg:min-h-full">
-          <Image src="https://images.unsplash.com/photo-1542314831-c6a4d14d837e?q=80&w=1000&auto=format&fit=crop" alt="Luxury Service" fill className="object-cover" />
-        </div>
-      </div>
-    </main>
+    <div className="min-h-screen bg-brand-bg pt-28 px-4 md:px-8">
+      <Suspense fallback={<div className="flex justify-center items-center h-64 text-brand-primary"><div className="w-8 h-8 border-4 border-brand-primary border-t-transparent rounded-full animate-spin"></div></div>}>
+        <BookingForm />
+      </Suspense>
+    </div>
   );
 }

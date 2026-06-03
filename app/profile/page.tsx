@@ -1,134 +1,225 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
-import { collection, query, where, getDocs } from "firebase/firestore";
-import { app, db } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
-import { CalendarHeart, Utensils, LogOut, CheckCircle, Clock, Loader2 } from "lucide-react";
+import { getAuth, onAuthStateChanged, signOut, User } from "firebase/auth";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { app, db } from "@/lib/firebase";
+import { motion, AnimatePresence } from "framer-motion";
+import { BedDouble, LogOut, Loader2, CalendarDays, Clock, CheckCircle, XCircle, User as UserIcon, Mail } from "lucide-react";
+import Link from "next/link";
 
 export default function ProfilePage() {
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [bookings, setBookings] = useState<any[]>([]);
-  const [orders, setOrders] = useState<any[]>([]);
 
+  // 1. Listen for Authentication State
   useEffect(() => {
     const auth = getAuth(app);
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       if (!currentUser) {
-        router.push("/auth");
-      } else if (currentUser.email === "admin@thevintagehouse.com") {
-        router.push("/admin"); // Redirect admin away from guest portal
+        router.push("/auth"); // Redirect to login if not authenticated
       } else {
-        setUser(currentUser);
-        if (currentUser.email) {
-          await fetchData(currentUser.email);
-        } else {
-          setLoading(false);
+        // If admin accidentally goes to profile, redirect to admin panel
+        if (currentUser.email === "admin@thevintagehouse.com") {
+          router.push("/admin/rooms");
+          return;
         }
+        setUser(currentUser);
       }
     });
     return () => unsubscribe();
   }, [router]);
 
-  const fetchData = async (email: string) => {
-    try {
-      // Fetch user's room bookings
-      const roomQ = query(collection(db, "room_requests"), where("email", "==", email));
-      const roomSnap = await getDocs(roomQ);
-      setBookings(roomSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+  // 2. Fetch User's Bookings in Real-Time
+  useEffect(() => {
+    if (!user || !user.email) return;
 
-      // Fetch user's food orders (Requires modifying food order to include email, or matching by name for now)
-      // For best practice, we query by email. Make sure your food ordering modal saves the email!
-      const foodQ = query(collection(db, "food_orders"), where("email", "==", email));
-      const foodSnap = await getDocs(foodQ);
-      setOrders(foodSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-    } catch (error) {
-      console.error("Failed to fetch user data", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    // Query bookings where the email matches the logged-in user
+    const q = query(collection(db, "bookings"), where("email", "==", user.email));
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const fetchedBookings = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      // Sort bookings by creation date (newest first) on the client side 
+      // to avoid needing complex Firebase database indexes
+      fetchedBookings.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      
+      setBookings(fetchedBookings);
+      setIsLoading(false);
+    });
 
-  const handleLogout = async () => {
+    return () => unsubscribe();
+  }, [user]);
+
+  const handleSignOut = async () => {
     const auth = getAuth(app);
     await signOut(auth);
     router.push("/");
   };
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-brand-primary" size={32} /></div>;
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-brand-bg flex items-center justify-center">
+        <Loader2 className="w-10 h-10 animate-spin text-brand-primary" />
+      </div>
+    );
+  }
 
   return (
-    <main className="min-h-screen bg-brand-bg pt-24 pb-20 px-4 md:px-6 lg:px-24">
+    <main className="min-h-screen bg-brand-bg pt-28 pb-20 px-4 md:px-8">
       <div className="max-w-5xl mx-auto space-y-8">
         
-        {/* Header */}
-        <div className="bg-white p-8 rounded-2xl border border-brand-secondary shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
-          <div>
-            <h1 className="font-serif text-3xl text-brand-text">Welcome, {user?.displayName || "Guest"}</h1>
-            <p className="text-brand-muted text-sm">{user?.email}</p>
+        {/* User Profile Header */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white p-6 md:p-8 rounded-2xl border border-gray-200 shadow-sm flex flex-col md:flex-row justify-between items-center gap-6"
+        >
+          <div className="flex items-center gap-5 w-full md:w-auto text-center md:text-left">
+            <div className="w-16 h-16 bg-brand-secondary/30 rounded-full flex items-center justify-center shrink-0 mx-auto md:mx-0">
+              <UserIcon className="w-8 h-8 text-brand-primary" />
+            </div>
+            <div>
+              <h1 className="font-serif text-2xl md:text-3xl text-brand-text mb-1">
+                Welcome back, {user.displayName || user.email?.split('@')[0]}
+              </h1>
+              <div className="flex items-center justify-center md:justify-start gap-2 text-gray-500 text-sm">
+                <Mail className="w-4 h-4" /> {user.email}
+              </div>
+            </div>
           </div>
-          <button onClick={handleLogout} className="flex items-center gap-2 text-sm uppercase tracking-widest font-bold text-red-500 hover:text-red-700 transition-colors">
-            <LogOut size={16} /> Sign Out
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           
-          {/* Bookings Section */}
-          <div className="bg-white rounded-2xl border border-brand-secondary shadow-sm overflow-hidden">
-            <div className="bg-gray-50 border-b border-brand-secondary p-6 flex items-center gap-3">
-              <CalendarHeart className="text-brand-primary" />
-              <h2 className="font-serif text-xl text-brand-text">Your Room Bookings</h2>
-            </div>
-            <div className="p-6 space-y-4">
-              {bookings.length > 0 ? bookings.map(booking => (
-                <div key={booking.id} className="p-4 border border-brand-secondary rounded-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                  <div>
-                    <h3 className="font-bold text-brand-text">{booking.roomName}</h3>
-                    <p className="text-xs text-brand-muted mt-1">
-                      {new Date(booking.checkIn).toLocaleDateString()} - {new Date(booking.checkOut).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase flex items-center gap-1 ${booking.status === 'Verified' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
-                    {booking.status === 'Verified' ? <CheckCircle size={12}/> : <Clock size={12}/>}
-                    {booking.status}
-                  </span>
-                </div>
-              )) : (
-                <p className="text-sm text-brand-muted text-center py-6">No room bookings found.</p>
-              )}
-            </div>
+          <button 
+            onClick={handleSignOut}
+            className="flex items-center gap-2 px-6 py-3 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg font-bold tracking-widest uppercase text-sm transition-colors w-full md:w-auto justify-center"
+          >
+            <LogOut className="w-4 h-4" /> Sign Out
+          </button>
+        </motion.div>
+
+        {/* Bookings Section */}
+        <div>
+          <div className="flex items-center gap-3 mb-6">
+            <BedDouble className="text-brand-primary w-6 h-6" />
+            <h2 className="font-serif text-2xl text-gray-800">Your Reservations</h2>
           </div>
 
-          {/* Food Orders Section */}
-          <div className="bg-white rounded-2xl border border-brand-secondary shadow-sm overflow-hidden">
-            <div className="bg-gray-50 border-b border-brand-secondary p-6 flex items-center gap-3">
-              <Utensils className="text-brand-primary" />
-              <h2 className="font-serif text-xl text-brand-text">Room Service Orders</h2>
+          {isLoading ? (
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-12 flex flex-col items-center justify-center">
+              <Loader2 className="w-10 h-10 animate-spin text-brand-primary mb-4" />
+              <p className="text-gray-500 font-medium">Loading your bookings...</p>
             </div>
-            <div className="p-6 space-y-4">
-              {orders.length > 0 ? orders.map(order => (
-                <div key={order.id} className="p-4 border border-brand-secondary rounded-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                  <div>
-                    <h3 className="font-bold text-brand-text">{order.productName}</h3>
-                    <p className="text-xs text-brand-muted mt-1">Room: {order.location}</p>
-                  </div>
-                  <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase flex items-center gap-1 ${order.status === 'Completed' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
-                    {order.status === 'Completed' ? <CheckCircle size={12}/> : <Clock size={12}/>}
-                    {order.status}
-                  </span>
-                </div>
-              )) : (
-                <p className="text-sm text-brand-muted text-center py-6">No recent food orders.</p>
-              )}
-            </div>
-          </div>
+          ) : bookings.length === 0 ? (
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+              className="bg-white rounded-2xl border border-gray-200 shadow-sm p-12 flex flex-col items-center justify-center text-center"
+            >
+              <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mb-6">
+                <CalendarDays className="w-10 h-10 text-gray-300" />
+              </div>
+              <h3 className="font-serif text-2xl text-gray-800 mb-2">No Reservations Yet</h3>
+              <p className="text-gray-500 mb-8 max-w-md">You haven&apos;t made any booking requests yet. Discover our luxury rooms and book your stay today.</p>
+              <Link href="/#accommodations">
+                <button className="bg-brand-text text-white px-8 py-4 rounded-xl font-bold tracking-widest uppercase hover:bg-brand-primary transition-colors">
+                  Explore Rooms
+                </button>
+              </Link>
+            </motion.div>
+          ) : (
+            <div className="grid grid-cols-1 gap-6">
+              <AnimatePresence>
+                {bookings.map((booking, index) => (
+                  <motion.div
+                    key={booking.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.1 }}
+                    className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col md:flex-row"
+                  >
+                    {/* Status & Price Sidebar */}
+                    <div className={`md:w-64 p-6 border-b md:border-b-0 md:border-r border-gray-100 flex flex-col justify-center ${
+                      booking.status === 'pending' ? 'bg-orange-50/50' : 
+                      booking.status === 'confirmed' ? 'bg-green-50/50' : 'bg-red-50/50'
+                    }`}>
+                      <div className="flex items-center gap-2 mb-4">
+                        {booking.status === 'pending' && <Clock className="text-orange-500 w-5 h-5" />}
+                        {booking.status === 'confirmed' && <CheckCircle className="text-green-500 w-5 h-5" />}
+                        {booking.status === 'cancelled' && <XCircle className="text-red-500 w-5 h-5" />}
+                        <span className={`font-bold uppercase tracking-widest text-sm ${
+                          booking.status === 'pending' ? 'text-orange-700' : 
+                          booking.status === 'confirmed' ? 'text-green-700' : 'text-red-700'
+                        }`}>
+                          {booking.status}
+                        </span>
+                      </div>
+                      
+                      <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Total Amount</p>
+                      <p className="text-3xl font-bold text-gray-900 mb-2">₹{booking.totalCost}</p>
+                      <p className="text-xs font-medium text-gray-500">
+                        Payable at Hotel
+                      </p>
+                    </div>
 
+                    {/* Booking Details */}
+                    <div className="flex-1 p-6 md:p-8 flex flex-col justify-between">
+                      <div>
+                        <div className="flex justify-between items-start mb-6">
+                          <div>
+                            <h3 className="font-serif text-2xl font-bold text-brand-text mb-2">{booking.roomType}</h3>
+                            <p className="text-sm font-bold text-brand-primary">
+                              {booking.nights} {booking.nights === 1 ? 'Night' : 'Nights'} • {booking.adults} Adults {booking.children > 0 && `• ${booking.children} Children`}
+                            </p>
+                          </div>
+                          <span className="text-xs text-gray-400">ID: {booking.id.slice(-6).toUpperCase()}</span>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row items-center gap-4 border-t border-gray-100 pt-6">
+                          <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 w-full">
+                            <p className="text-xs uppercase text-gray-500 font-bold mb-1 flex items-center gap-2"><CalendarDays className="w-4 h-4"/> Check-In</p>
+                            <p className="font-bold text-gray-800 text-lg">{new Date(booking.checkIn).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                            <p className="text-xs text-gray-500 mt-1">From 2:00 PM</p>
+                          </div>
+                          
+                          <div className="hidden sm:block text-gray-300">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                          </div>
+                          
+                          <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 w-full">
+                            <p className="text-xs uppercase text-gray-500 font-bold mb-1 flex items-center gap-2"><CalendarDays className="w-4 h-4"/> Check-Out</p>
+                            <p className="font-bold text-gray-800 text-lg">{new Date(booking.checkOut).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                            <p className="text-xs text-gray-500 mt-1">By 11:00 AM</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {booking.status === 'pending' && (
+                        <div className="mt-6 p-4 bg-orange-50 border border-orange-100 rounded-lg text-sm text-orange-800 flex items-start gap-3">
+                          <Clock className="w-5 h-5 shrink-0 mt-0.5" />
+                          <p>Your booking request is currently being reviewed by our team. We will confirm your reservation shortly.</p>
+                        </div>
+                      )}
+                      
+                      {booking.status === 'confirmed' && (
+                        <div className="mt-6 p-4 bg-green-50 border border-green-100 rounded-lg text-sm text-green-800 flex items-start gap-3">
+                          <CheckCircle className="w-5 h-5 shrink-0 mt-0.5" />
+                          <p>Your reservation is confirmed! We look forward to hosting you. Please remember to bring a valid government ID for check-in.</p>
+                        </div>
+                      )}
+
+                    </div>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </div>
+          )}
         </div>
+
       </div>
     </main>
   );
