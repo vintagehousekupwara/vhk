@@ -17,12 +17,17 @@ const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "Ju
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const ROOM_CATEGORIES = ["King Size", "Double Bed"];
 
+const DEFAULT_PRICING = {
+  kingSize: { onePerson: 4000, twoPerson: 5000, extraChild: 1000 },
+  doubleBed: { onePerson: 3000, twoPerson: 3500, threePerson: 4500, fourPerson: 5500, extraChild: 800 }
+};
+
 export default function AdminCalendar() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [roomType, setRoomType] = useState(ROOM_CATEGORIES[0]);
   
   const [inventoryMap, setInventoryMap] = useState<Record<string, any>>({});
-  const [globalPricing, setGlobalPricing] = useState({ kingSize: 5000, doubleBed: 3500, childCharge: 500 });
+  const [globalPricing, setGlobalPricing] = useState(DEFAULT_PRICING);
   const [isLoading, setIsLoading] = useState(true);
 
   // Editing States
@@ -31,7 +36,7 @@ export default function AdminCalendar() {
   
   // Pricing Modal State
   const [isPricingModalOpen, setIsPricingModalOpen] = useState(false);
-  const [pricingForm, setPricingForm] = useState({ kingSize: 0, doubleBed: 0, childCharge: 0 });
+  const [pricingForm, setPricingForm] = useState(DEFAULT_PRICING);
   
   const [isSaving, setIsSaving] = useState(false);
 
@@ -42,11 +47,10 @@ export default function AdminCalendar() {
   useEffect(() => {
     const unsubPricing = onSnapshot(doc(db, "settings", "global_pricing"), (docSnap) => {
       if (docSnap.exists()) {
-        const data = docSnap.data() as any;
+        const data = docSnap.data();
         setGlobalPricing({
-          kingSize: data.kingSize || 5000,
-          doubleBed: data.doubleBed || 3500,
-          childCharge: data.childCharge || 500
+          kingSize: { ...DEFAULT_PRICING.kingSize, ...data.kingSize },
+          doubleBed: { ...DEFAULT_PRICING.doubleBed, ...data.doubleBed }
         });
       }
     });
@@ -89,7 +93,8 @@ export default function AdminCalendar() {
     };
   }, [currentDate]);
 
-  const openEditor = (dateStr: string) => {
+  const openEditor = (dateStr: string, isPast: boolean) => {
+    if (isPast) return; // Prevent opening editor for past dates
     const existing = inventoryMap[dateStr];
     setEditForm({ available: existing ? existing.available : 0 });
     setEditingDate(dateStr);
@@ -128,9 +133,18 @@ export default function AdminCalendar() {
     setIsSaving(true);
     try {
       await setDoc(doc(db, "settings", "global_pricing"), {
-        kingSize: Number(pricingForm.kingSize),
-        doubleBed: Number(pricingForm.doubleBed),
-        childCharge: Number(pricingForm.childCharge),
+        kingSize: {
+          onePerson: Number(pricingForm.kingSize.onePerson),
+          twoPerson: Number(pricingForm.kingSize.twoPerson),
+          extraChild: Number(pricingForm.kingSize.extraChild),
+        },
+        doubleBed: {
+          onePerson: Number(pricingForm.doubleBed.onePerson),
+          twoPerson: Number(pricingForm.doubleBed.twoPerson),
+          threePerson: Number(pricingForm.doubleBed.threePerson),
+          fourPerson: Number(pricingForm.doubleBed.fourPerson),
+          extraChild: Number(pricingForm.doubleBed.extraChild),
+        },
         updatedAt: new Date().toISOString()
       }, { merge: true });
       setIsPricingModalOpen(false);
@@ -141,6 +155,10 @@ export default function AdminCalendar() {
     }
   };
 
+  // Pre-calculate today at midnight for accurate past-date checking
+  const todayAtMidnight = new Date();
+  todayAtMidnight.setHours(0, 0, 0, 0);
+
   return (
     <div className="space-y-6 pb-20 p-2 md:p-6">
       <div className="bg-white p-4 md:p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -148,7 +166,7 @@ export default function AdminCalendar() {
           <h2 className="text-xl md:text-2xl font-bold text-gray-800 flex items-center gap-2">
             <BedDouble className="text-brand-primary" /> Daily Room Inventory
           </h2>
-          <p className="text-gray-500 text-sm mt-1">Manage live availability and global pricing.</p>
+          <p className="text-gray-500 text-sm mt-1">Manage live availability and granular room rates.</p>
         </div>
 
         <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
@@ -189,22 +207,34 @@ export default function AdminCalendar() {
               const dayNum = i + 1;
               const dateObj = new Date(currentDate.getFullYear(), currentDate.getMonth(), dayNum);
               const dateStr = formatYYYYMMDD(dateObj);
+              
+              const isPast = dateObj < todayAtMidnight;
+              const isToday = formatYYYYMMDD(todayAtMidnight) === dateStr;
+              
               const data = inventoryMap[dateStr];
               const isAvailable = data && data.available > 0;
-              const isToday = formatYYYYMMDD(new Date()) === dateStr;
 
               return (
-                <div key={dateStr} onClick={() => openEditor(dateStr)} className={`min-h-[80px] md:min-h-[120px] border-b border-r border-gray-100 p-1 md:p-2 cursor-pointer transition-colors flex flex-col group ${isToday ? "bg-orange-50/30" : "hover:bg-gray-50"}`}>
+                <div 
+                  key={dateStr} 
+                  onClick={() => openEditor(dateStr, isPast)} 
+                  className={`min-h-[80px] md:min-h-[120px] border-b border-r border-gray-100 p-1 md:p-2 transition-colors flex flex-col group 
+                    ${isPast ? "bg-gray-100/50 opacity-60 cursor-not-allowed" : "cursor-pointer hover:bg-gray-50"}
+                    ${isToday ? "bg-orange-50/30" : ""}
+                  `}
+                >
                   <div className="flex justify-between items-start mb-1 md:mb-2">
-                    <span className={`text-xs md:text-sm font-bold w-6 h-6 md:w-7 md:h-7 flex items-center justify-center rounded-full ${isToday ? "bg-brand-primary text-white" : "text-gray-700"}`}>{dayNum}</span>
+                    <span className={`text-xs md:text-sm font-bold w-6 h-6 md:w-7 md:h-7 flex items-center justify-center rounded-full ${isToday ? "bg-brand-primary text-white" : "text-gray-700"}`}>
+                      {dayNum}
+                    </span>
                   </div>
                   <div className="mt-auto flex flex-col gap-1">
                     {data ? (
-                      <div className={`text-[9px] md:text-xs font-bold px-1 py-1 rounded text-center ${isAvailable ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+                      <div className={`text-[9px] md:text-xs font-bold px-1 py-1 rounded text-center ${isAvailable ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"} ${isPast ? "grayscale" : ""}`}>
                         {isAvailable ? `${data.available} Left` : "Sold Out"}
                       </div>
                     ) : (
-                      <div className="text-[9px] md:text-[10px] text-gray-400 font-bold px-1 py-1 text-center bg-gray-100 rounded">0 Left</div>
+                      <div className="text-[9px] md:text-[10px] text-gray-400 font-bold px-1 py-1 text-center bg-gray-200/50 rounded">0 Left</div>
                     )}
                   </div>
                 </div>
@@ -241,35 +271,75 @@ export default function AdminCalendar() {
         )}
       </AnimatePresence>
 
-      {/* Global Pricing Modal */}
+      {/* Advanced Global Pricing Modal */}
       <AnimatePresence>
         {isPricingModalOpen && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center px-4">
-            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="bg-white rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center px-4 py-6">
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="bg-white rounded-2xl w-full max-w-4xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
               <div className="bg-gray-50 p-5 border-b border-gray-200 flex justify-between items-center sticky top-0 z-10">
                 <div className="flex items-center gap-2">
                   <IndianRupee className="text-brand-primary" />
-                  <h3 className="font-bold text-gray-800 text-lg">Global Pricing</h3>
+                  <h3 className="font-bold text-gray-800 text-lg">Granular Global Rates</h3>
                 </div>
                 <button type="button" onClick={() => setIsPricingModalOpen(false)} className="p-2 bg-gray-200 hover:bg-gray-300 rounded-full text-gray-600 transition-colors"><X size={18} /></button>
               </div>
 
-              <form onSubmit={handleSavePricing} className="p-6 space-y-5">
-                <div>
-                  <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2 block">King Size Rate (₹)</label>
-                  <input required type="number" min="0" value={pricingForm.kingSize} onChange={e => setPricingForm({...pricingForm, kingSize: Number(e.target.value)})} className="w-full px-3 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary font-bold text-lg text-gray-800" />
+              <form onSubmit={handleSavePricing} className="p-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  
+                  {/* King Size Config */}
+                  <div className="space-y-4">
+                    <h4 className="font-serif text-xl border-b pb-2 text-brand-text">King Size Room</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase">1 Person (₹)</label>
+                        <input required type="number" min="0" value={pricingForm.kingSize.onePerson} onChange={e => setPricingForm(p => ({...p, kingSize: {...p.kingSize, onePerson: Number(e.target.value)}}))} className="w-full p-2 border rounded mt-1 font-bold text-gray-800 focus:outline-none focus:border-brand-primary" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase">2 Persons (₹)</label>
+                        <input required type="number" min="0" value={pricingForm.kingSize.twoPerson} onChange={e => setPricingForm(p => ({...p, kingSize: {...p.kingSize, twoPerson: Number(e.target.value)}}))} className="w-full p-2 border rounded mt-1 font-bold text-gray-800 focus:outline-none focus:border-brand-primary" />
+                      </div>
+                    </div>
+                    <div className="bg-orange-50 p-3 rounded-lg border border-orange-100">
+                      <label className="text-xs font-bold text-orange-800 uppercase">Extra Child Rate (₹)</label>
+                      <input required type="number" min="0" value={pricingForm.kingSize.extraChild} onChange={e => setPricingForm(p => ({...p, kingSize: {...p.kingSize, extraChild: Number(e.target.value)}}))} className="w-full p-2 border border-orange-200 rounded mt-1 font-bold text-gray-800 focus:outline-none" />
+                    </div>
+                  </div>
+
+                  {/* Double Bed Config */}
+                  <div className="space-y-4">
+                    <h4 className="font-serif text-xl border-b pb-2 text-brand-text">Double Bed Room</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase">1 Person (₹)</label>
+                        <input required type="number" min="0" value={pricingForm.doubleBed.onePerson} onChange={e => setPricingForm(p => ({...p, doubleBed: {...p.doubleBed, onePerson: Number(e.target.value)}}))} className="w-full p-2 border rounded mt-1 font-bold text-gray-800 focus:outline-none focus:border-brand-primary" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase">2 Persons (₹)</label>
+                        <input required type="number" min="0" value={pricingForm.doubleBed.twoPerson} onChange={e => setPricingForm(p => ({...p, doubleBed: {...p.doubleBed, twoPerson: Number(e.target.value)}}))} className="w-full p-2 border rounded mt-1 font-bold text-gray-800 focus:outline-none focus:border-brand-primary" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase">3 Persons (₹)</label>
+                        <input required type="number" min="0" value={pricingForm.doubleBed.threePerson} onChange={e => setPricingForm(p => ({...p, doubleBed: {...p.doubleBed, threePerson: Number(e.target.value)}}))} className="w-full p-2 border rounded mt-1 font-bold text-gray-800 focus:outline-none focus:border-brand-primary" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase">4 Persons (₹)</label>
+                        <input required type="number" min="0" value={pricingForm.doubleBed.fourPerson} onChange={e => setPricingForm(p => ({...p, doubleBed: {...p.doubleBed, fourPerson: Number(e.target.value)}}))} className="w-full p-2 border rounded mt-1 font-bold text-gray-800 focus:outline-none focus:border-brand-primary" />
+                      </div>
+                    </div>
+                    <div className="bg-orange-50 p-3 rounded-lg border border-orange-100">
+                      <label className="text-xs font-bold text-orange-800 uppercase">Extra Child Rate (₹)</label>
+                      <input required type="number" min="0" value={pricingForm.doubleBed.extraChild} onChange={e => setPricingForm(p => ({...p, doubleBed: {...p.doubleBed, extraChild: Number(e.target.value)}}))} className="w-full p-2 border border-orange-200 rounded mt-1 font-bold text-gray-800 focus:outline-none" />
+                    </div>
+                  </div>
+
                 </div>
-                <div>
-                  <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2 block">Double Bed Rate (₹)</label>
-                  <input required type="number" min="0" value={pricingForm.doubleBed} onChange={e => setPricingForm({...pricingForm, doubleBed: Number(e.target.value)})} className="w-full px-3 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary font-bold text-lg text-gray-800" />
+
+                <div className="mt-8 border-t pt-6">
+                  <button type="submit" disabled={isSaving} className="w-full bg-slate-900 text-white py-4 rounded-lg font-bold tracking-widest uppercase hover:bg-slate-800 transition-colors flex justify-center items-center gap-2">
+                    {isSaving ? <Loader2 className="animate-spin" size={18} /> : <><Save size={18} /> Update Pricing </>}
+                  </button>
                 </div>
-                <div>
-                  <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2 block">Extra Child Charge (₹)</label>
-                  <input required type="number" min="0" value={pricingForm.childCharge} onChange={e => setPricingForm({...pricingForm, childCharge: Number(e.target.value)})} className="w-full px-3 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary font-bold text-lg text-gray-800" />
-                </div>
-                <button type="submit" disabled={isSaving} className="w-full bg-slate-900 text-white py-4 rounded-lg font-bold tracking-widest uppercase hover:bg-slate-800 transition-colors flex justify-center items-center gap-2 mt-4">
-                  {isSaving ? <Loader2 className="animate-spin" size={18} /> : <><Save size={18} /> Update Pricing</>}
-                </button>
               </form>
             </motion.div>
           </div>
