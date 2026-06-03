@@ -4,9 +4,15 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { collection, query, where, onSnapshot, doc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { ArrowRight, CalendarDays, Star, Maximize, BedDouble, Wind, Search, Users, ShieldCheck, Utensils } from "lucide-react";
+import { 
+  ArrowRight, CalendarDays, Star, Maximize, 
+  BedDouble, Wind, Search, Users, ShieldCheck, 
+  Utensils, ShoppingCart 
+} from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useCart } from "@/context/CartContext";
 
 const formatYYYYMMDD = (date: Date) => {
   const y = date.getFullYear();
@@ -17,6 +23,8 @@ const formatYYYYMMDD = (date: Date) => {
 
 export default function HomeClient({ rooms, dishes }: { rooms: any[], dishes: any[] }) {
   const [searchQuery, setSearchQuery] = useState("");
+  const router = useRouter();
+  const { addToCart } = useCart();
   
   // Real-time Database States
   const [globalPricing, setGlobalPricing] = useState({ kingSize: 5000, doubleBed: 3500 });
@@ -53,11 +61,20 @@ export default function HomeClient({ rooms, dishes }: { rooms: any[], dishes: an
     return () => unsub();
   }, []);
 
-  // Live search filtering
+  // Unified Buy Now Logic
+  const handleBuyNow = (dish: any) => {
+    addToCart(dish);
+    router.push('/checkout');
+  };
+
+  // Search filtering logic
   const filteredDishes = dishes.filter(dish => 
     dish.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     dish.category.toLowerCase().includes(searchQuery.toLowerCase())
-  ).slice(0, 30);
+  );
+
+  // If user is searching, show all matches. Otherwise, just show top 8 for performance/UX.
+  const displayedDishes = searchQuery ? filteredDishes : filteredDishes.slice(0, 8);
 
   return (
     <main className="w-full overflow-hidden">
@@ -359,7 +376,7 @@ export default function HomeClient({ rooms, dishes }: { rooms: any[], dishes: an
         </div>
       </section>
 
-      {/* 4. EXPLORE KASHMIR - UPGRADED MASSIVE CARDS */}
+      {/* 4. EXPLORE KASHMIR */}
       <section className="w-full bg-white py-16 md:py-24 px-4 md:px-6 lg:px-24 border-t border-brand-secondary/50">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 md:mb-16 gap-6">
@@ -394,10 +411,10 @@ export default function HomeClient({ rooms, dishes }: { rooms: any[], dishes: an
           
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-10">
             {[
-              { name: "Keran Valley", img: "https://images.unsplash.com/photo-1595815771614-ade9d652a65d?q=80&w=1200&auto=format&fit=crop" },
+              { name: "Keran Valley", img: "https://res.cloudinary.com/dfdnjuhpw/image/upload/q_auto/f_auto/v1780495146/kkk_zynfng.jpg" },
               { name: "Bungus Valley", img: "https://res.cloudinary.com/dfdnjuhpw/image/upload/q_auto/f_auto/v1780469195/bungus_valley_fsuopv.jpg" },
-              { name: "Sharda Mandir", img: "https://res.cloudinary.com/dfdnjuhpw/image/upload/q_auto/f_auto/v1780469247/Sharda-Peeth-Temple-Teetwal-Kupwara_u7oct7.jpg" },
-              { name: "Lolab Valley", img: "https://images.unsplash.com/photo-1598091383021-15ddea10925d?q=80&w=1200&auto=format&fit=crop" }
+              { name: "Sharda Mandir", img: "https://res.cloudinary.com/dfdnjuhpw/image/upload/q_auto/f_auto/v1780495015/2024_7_largeimg_476843546_ubb7dv.jpg" },
+              { name: "Lolab Valley", img: "https://res.cloudinary.com/dfdnjuhpw/image/upload/q_auto/f_auto/v1780497987/0_lryde3.jpg" }
             ].map((place, index) => (
               <motion.div 
                 key={place.name} 
@@ -430,28 +447,116 @@ export default function HomeClient({ rooms, dishes }: { rooms: any[], dishes: an
       {/* 5. FOOD SECTION */}
       <section className="w-full bg-brand-secondary/20 py-20 md:py-24 px-4 md:px-6 lg:px-24">
         <div className="max-w-7xl mx-auto">
+          
           <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 md:mb-16 gap-6">
             <div>
-              <motion.h3 initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="font-serif text-3xl md:text-4xl text-brand-text">In-House Restaurant</motion.h3>
+              <motion.span 
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                className="text-brand-primary tracking-widest uppercase text-xs md:text-sm font-medium mb-2 block"
+              >
+                Dining & Room Service
+              </motion.span>
+              <motion.h3 
+                initial={{ opacity: 0, y: 20 }} 
+                whileInView={{ opacity: 1, y: 0 }} 
+                viewport={{ once: true }} 
+                className="font-serif text-3xl md:text-4xl text-brand-text"
+              >
+                In-House Restaurant
+              </motion.h3>
             </div>
             <div className="relative w-full md:w-72">
               <Search size={18} className="absolute left-4 top-3.5 text-brand-accent" />
-              <input type="text" placeholder="Search dishes..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-12 pr-4 py-3 bg-white border border-brand-secondary focus:border-brand-primary focus:outline-none" />
+              <input 
+                type="text" 
+                placeholder="Search dishes..." 
+                value={searchQuery} 
+                onChange={(e) => setSearchQuery(e.target.value)} 
+                className="w-full pl-12 pr-4 py-3 bg-white border border-brand-secondary focus:border-brand-primary focus:outline-none shadow-sm" 
+              />
             </div>
           </div>
+          
           <div className="grid grid-cols-2 md:grid-cols-4 gap-x-3 gap-y-12 md:gap-x-6 md:gap-y-16">
-            {filteredDishes.length > 0 ? filteredDishes.map((dish) => (
-              <div key={dish.id} className="group relative bg-white rounded-t-[40px] md:rounded-t-[80px] rounded-b-xl p-3 md:p-5 pt-12 md:pt-20 shadow-sm hover:shadow-floating transition-shadow duration-300 border border-brand-secondary flex flex-col items-center text-center mt-6 md:mt-10">
-                <div className="absolute -top-8 md:-top-12 left-1/2 -translate-x-1/2 w-20 h-20 md:w-32 md:h-32 rounded-full z-10">
-                  <div className="w-full h-full relative group-hover:-translate-y-1 transition-transform duration-300">
-                    <Image src={dish.image} alt={dish.name} fill sizes="(max-width: 768px) 80px, 128px" className="object-cover drop-shadow-xl rounded-full" />
+            {displayedDishes.length > 0 ? (
+              <>
+                {displayedDishes.map((dish) => (
+                  <div 
+                    key={dish.id} 
+                    className="group relative bg-white rounded-t-[40px] md:rounded-t-[80px] rounded-b-xl p-3 md:p-5 pt-12 md:pt-20 shadow-sm hover:shadow-floating transition-shadow duration-300 border border-brand-secondary flex flex-col items-center text-center mt-6 md:mt-10"
+                  >
+                    <div className="absolute -top-8 md:-top-12 left-1/2 -translate-x-1/2 w-20 h-20 md:w-32 md:h-32 rounded-full z-10">
+                      <div className="w-full h-full relative group-hover:-translate-y-1 transition-transform duration-300">
+                        <Image src={dish.image} alt={dish.name} fill sizes="(max-width: 768px) 80px, 128px" className="object-cover drop-shadow-xl rounded-full" />
+                      </div>
+                    </div>
+                    
+                    <span className="text-brand-primary text-[9px] md:text-[10px] uppercase tracking-widest font-bold mb-1 block">
+                      {dish.category}
+                    </span>
+                    <h4 className="font-serif text-sm md:text-lg text-brand-text font-bold mb-1 line-clamp-1">
+                      {dish.name}
+                    </h4>
+                    
+                    <div className="flex items-center gap-1 text-brand-accent mb-3">
+                      <Star size={10} className="fill-brand-accent md:w-3 md:h-3" />
+                      <span className="text-[10px] md:text-xs font-medium">{dish.rating || 4.8}</span>
+                    </div>
+
+                    <div className="mt-auto w-full flex flex-col gap-3 border-t border-brand-secondary pt-3 md:pt-4">
+                      <span className="font-serif text-base md:text-xl font-bold text-brand-primary block text-center">
+                        ₹{dish.price}
+                      </span>
+                      
+                      <div className="flex items-center justify-center gap-1.5 md:gap-2 w-full">
+                        <button 
+                          onClick={() => addToCart(dish)}
+                          className="p-1.5 md:p-2 border border-brand-secondary text-brand-text hover:bg-brand-bg hover:text-brand-primary rounded transition-colors"
+                          title="Add to Cart"
+                        >
+                          <ShoppingCart size={14} className="md:w-4 md:h-4" />
+                        </button>
+
+                        <button 
+                          onClick={() => handleBuyNow(dish)}
+                          className="flex-1 bg-brand-primary text-white text-[9px] md:text-[11px] px-2 py-1.5 md:py-2 rounded uppercase tracking-widest font-bold hover:bg-[#A65520] transition-colors whitespace-nowrap"
+                        >
+                          Buy Now
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                </div>
-                <span className="text-brand-primary text-[9px] md:text-[10px] uppercase tracking-widest font-bold mb-1">{dish.category}</span>
-                <h4 className="font-serif text-sm md:text-lg text-brand-text font-bold mb-1 line-clamp-1">{dish.name}</h4>
-                <div className="mt-auto w-full flex items-center justify-between border-t border-brand-secondary pt-3"><span className="font-serif text-base md:text-xl font-bold text-brand-primary">₹{dish.price}</span><Link href="/menu"><button className="w-8 h-8 rounded-full border border-brand-primary flex items-center justify-center text-brand-primary hover:bg-brand-primary hover:text-white transition-colors"><ArrowRight size={14} /></button></Link></div>
+                ))}
+
+                {/* HIGHLIGHTED VIEW FULL MENU BUTTON */}
+                {!searchQuery && dishes.length > 8 && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    className="col-span-2 md:col-span-4 flex justify-center mt-8 md:mt-12"
+                  >
+                    <Link href="/menu">
+                      <button className="group relative inline-flex items-center gap-3 bg-brand-bg border border-brand-primary text-brand-primary px-8 py-4 text-xs md:text-sm tracking-widest uppercase font-bold hover:bg-brand-primary hover:text-white transition-all duration-300 shadow-sm hover:shadow-luxury rounded-lg overflow-hidden z-10">
+                        <span className="relative z-10 flex items-center gap-2">
+                          View Full Menu <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+                        </span>
+                        <div className="absolute inset-0 bg-brand-primary translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out z-0" />
+                      </button>
+                    </Link>
+                  </motion.div>
+                )}
+              </>
+            ) : (
+              <div className="col-span-2 md:col-span-4 text-center py-12 bg-white rounded-xl border border-brand-secondary">
+                <p className="text-brand-muted font-serif text-xl italic mb-4">No dishes found matching &quot;{searchQuery}&quot;</p>
+                <button onClick={() => setSearchQuery("")} className="text-brand-primary text-sm font-bold uppercase tracking-widest hover:underline">
+                  Clear Search
+                </button>
               </div>
-            )) : <div className="col-span-2 md:col-span-4 text-center py-12"><p className="text-brand-muted font-serif text-xl italic">No dishes found matching &quot;{searchQuery}&quot;</p></div>}
+            )}
           </div>
         </div>
       </section>

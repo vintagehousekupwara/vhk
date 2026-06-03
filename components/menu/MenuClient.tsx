@@ -4,13 +4,14 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Star, Search, ShoppingCart } from "lucide-react";
 import Image from "next/image";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCart } from "@/context/CartContext";
 
 export default function MenuClient({ dishes }: { dishes: any[] }) {
   const [activeFilter, setActiveFilter] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const { addToCart } = useCart();
+  const router = useRouter();
 
   const CATEGORIES = ["All", ...Array.from(new Set(dishes.map(item => item.category)))];
 
@@ -20,6 +21,11 @@ export default function MenuClient({ dishes }: { dishes: any[] }) {
                           (dish.description?.toLowerCase() || "").includes(searchQuery.toLowerCase());
     return matchesCategory && matchesSearch;
   });
+
+  const handleBuyNow = (dish: any) => {
+    addToCart(dish);
+    router.push('/checkout');
+  };
 
   return (
     <main className="min-h-screen bg-brand-bg pt-20 pb-24 px-4 md:px-6 lg:px-24">
@@ -102,11 +108,12 @@ export default function MenuClient({ dishes }: { dishes: any[] }) {
                     <ShoppingCart size={16} />
                   </button>
 
-                  <Link href={`/order?item=${encodeURIComponent(dish.name)}`}>
-                    <button className="bg-brand-primary text-white text-[10px] md:text-xs px-3 py-1.5 md:px-4 md:py-2 rounded uppercase tracking-widest font-bold hover:bg-[#A65520] transition-colors whitespace-nowrap">
-                      Order Now
-                    </button>
-                  </Link>
+                  <button 
+                    onClick={() => handleBuyNow(dish)}
+                    className="bg-brand-primary text-white text-[10px] md:text-xs px-3 py-1.5 md:px-4 md:py-2 rounded uppercase tracking-widest font-bold hover:bg-[#A65520] transition-colors whitespace-nowrap"
+                  >
+                    Order Now
+                  </button>
                 </div>
                 
               </div>

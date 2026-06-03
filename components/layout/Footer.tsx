@@ -90,7 +90,7 @@ export default function Footer() {
           <div className="lg:col-span-2 flex flex-col items-center md:items-start text-center md:text-left">
             <h4 className="font-serif text-lg text-white mb-6 uppercase tracking-[0.15em]">Hotel</h4>
             <ul className="space-y-4 text-xs tracking-widest uppercase text-brand-muted font-bold">
-              <li><Link href="/rooms" className="hover:text-brand-primary transition-colors block">Our Suites</Link></li>
+              <li><Link href="/#accommodations" className="hover:text-brand-primary transition-colors block">Our Suites</Link></li>
               <li><Link href="/about" className="hover:text-brand-primary transition-colors block">Amenities</Link></li>
               <li><Link href="/book" className="hover:text-brand-primary transition-colors block">Book a Stay</Link></li>
             </ul>
@@ -109,12 +109,19 @@ export default function Footer() {
         </div>
 
         {/* BOTTOM COPYRIGHT BAR */}
-        <div className="border-t border-white/10 pt-8 mt-4 flex flex-col md:flex-row justify-between items-center gap-4 text-[10px] text-brand-muted tracking-[0.15em] uppercase font-bold">
-          <p>© {new Date().getFullYear()} THE VINTAGE HOUSE INC.</p>
-          <div className="flex space-x-6 md:space-x-8">
-            <Link href="#" className="hover:text-white transition-colors">Privacy Policy</Link>
-            <Link href="#" className="hover:text-white transition-colors">Terms of Service</Link>
+        <div className="w-full border-t border-brand-secondary/40 mt-16 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
+          <p className="text-brand-muted text-sm">
+            &copy; {new Date().getFullYear()} The Vintage House Kupwara. All rights reserved.
+          </p>
+          
+          <div className="flex gap-4 text-sm text-brand-muted">
+            <Link href="/terms" className="hover:text-brand-primary transition-colors">Terms</Link>
+            <Link href="/privacy" className="hover:text-brand-primary transition-colors">Privacy</Link>
           </div>
+
+          <p className="text-sm text-brand-muted">
+            Designed and Developed by <a href="mailto:officialhaadi81@gmail.com" className="text-brand-primary font-bold hover:underline tracking-widest">H Studio</a>
+          </p>
         </div>
       </div>
     </footer>
