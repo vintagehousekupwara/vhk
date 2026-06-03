@@ -1,26 +1,48 @@
 @import "tailwindcss";
+@import "react-datepicker/dist/react-datepicker.css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@theme {
+  /* Brand Colors */
+  --color-brand-primary: #C86A2B;
+  --color-brand-secondary: #F4E7D3;
+  --color-brand-accent: #8B5E3C;
+  --color-brand-bg: #FFFDF9;
+  --color-brand-text: #1F1F1F;
+  --color-brand-muted: #6E6E6E;
+
+  /* Brand Fonts */
+  --font-serif: var(--font-playfair), serif;
+  --font-sans: var(--font-inter), sans-serif;
+
+  /* Custom Shadows */
+  --shadow-luxury: 0 20px 40px -15px rgba(200, 106, 43, 0.15);
+  --shadow-floating: 0 30px 60px -20px rgba(0, 0, 0, 0.3);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+@layer base {
+  /* Avoiding @apply here prevents the specific error you saw */
+  body {
+    background-color: var(--color-brand-bg);
+    color: var(--color-brand-text);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  ::selection {
+    background-color: var(--color-brand-primary);
+    color: white;
+  }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  html {
+    scroll-behavior: smooth;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Custom utility to hide scrollbars but keep functionality */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
