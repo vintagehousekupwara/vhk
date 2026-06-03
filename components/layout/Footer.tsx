@@ -120,7 +120,7 @@ export default function Footer() {
           </div>
 
           <p className="text-sm text-brand-muted">
-            Designed and Developed by <a href="mailto:officialhaadi81@gmail.com" className="text-brand-primary font-bold hover:underline tracking-widest">H Studio</a>
+            Developed by <a href="mailto:officialhaadi81@gmail.com" className="text-brand-primary font-bold hover:underline tracking-widest">H Studio</a>
           </p>
         </div>
       </div>
