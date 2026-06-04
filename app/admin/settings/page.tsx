@@ -1,0 +1,204 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { doc, getDoc, setDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { Loader2, Save, Image as ImageIcon, MapPin, UploadCloud } from "lucide-react";
+import { purgeWebsiteCache } from "@/app/actions/cache";
+
+// --- REUSABLE CLOUDINARY UPLOAD COMPONENT ---
+const CloudinaryUpload = ({ currentImage, onUpload }: { currentImage: string, onUpload: (url: string) => void }) => {
+  const [uploading, setUploading] = useState(false);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    const formData = new FormData();
+    formData.append("file", file);
+    
+    // Automatically pulling from your .env.local
+    formData.append("upload_preset", process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET as string); 
+
+    try {
+      const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME as string;
+      const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+        method: "POST",
+        body: formData,
+      });
+      const data = await response.json();
+      
+      if (data.secure_url) {
+        onUpload(data.secure_url);
+      } else {
+        alert("Upload failed: " + (data.error?.message || "Unknown error"));
+      }
+    } catch (error) {
+      console.error("Cloudinary upload error:", error);
+      alert("Something went wrong with the upload.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-4 mt-2">
+      {currentImage && (
+        <img src={currentImage} alt="Preview" className="w-16 h-16 object-cover rounded-lg border border-gray-200 shadow-sm shrink-0" />
+      )}
+      <div className="relative w-full">
+        <input 
+          type="file" 
+          accept="image/*" 
+          onChange={handleFileChange} 
+          disabled={uploading}
+          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed" 
+        />
+        <div className={`w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed rounded-lg transition-colors ${uploading ? 'bg-gray-50 border-gray-300 text-gray-400' : 'bg-brand-primary/5 border-brand-primary/30 text-brand-primary hover:bg-brand-primary/10 cursor-pointer'}`}>
+          {uploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <UploadCloud className="w-5 h-5" />}
+          <span className="font-bold text-sm tracking-wide uppercase">
+            {uploading ? "Uploading to Cloudinary..." : "Click or Tap to Upload Image"}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- DEFAULT HOMEPAGE DATA ---
+const DEFAULT_HOME_DATA = {
+  heroImage: "https://images.unsplash.com/photo-1618221118493-9cfa1a1c00da?q=80&w=1200&auto=format&fit=crop",
+  kingSizeImage: "https://images.unsplash.com/photo-1590490360182-c33d57733427?q=80&w=1200&auto=format&fit=crop",
+  doubleBedImage: "https://res.cloudinary.com/dfdnjuhpw/image/upload/q_auto/f_auto/v1780488159/db_fvbirv.jpg",
+  destinations: [
+    { name: "Keran Valley", img: "https://res.cloudinary.com/dfdnjuhpw/image/upload/q_auto/f_auto/v1780495146/kkk_zynfng.jpg" },
+    { name: "Bungus Valley", img: "https://res.cloudinary.com/dfdnjuhpw/image/upload/q_auto/f_auto/v1780469195/bungus_valley_fsuopv.jpg" },
+    { name: "Sharda Mandir", img: "https://res.cloudinary.com/dfdnjuhpw/image/upload/q_auto/f_auto/v1780495015/2024_7_largeimg_476843546_ubb7dv.jpg" },
+    { name: "Lolab Valley", img: "https://res.cloudinary.com/dfdnjuhpw/image/upload/q_auto/f_auto/v1780497987/0_lryde3.jpg" }
+  ]
+};
+
+export default function AdminHomepageSettings() {
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [homeData, setHomeData] = useState(DEFAULT_HOME_DATA);
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      const docSnap = await getDoc(doc(db, "settings", "homepage"));
+      if (docSnap.exists()) {
+        setHomeData({ ...DEFAULT_HOME_DATA, ...docSnap.data() });
+      }
+      setLoading(false);
+    };
+    fetchSettings();
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await setDoc(doc(db, "settings", "homepage"), homeData);
+      await purgeWebsiteCache();
+      alert("Homepage settings updated successfully!");
+    } catch (error) {
+      console.error("Error saving homepage settings", error);
+      alert("Failed to save settings.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const updateDestination = (index: number, field: "name" | "img", value: string) => {
+    const newDestinations = [...homeData.destinations];
+    newDestinations[index][field] = value;
+    setHomeData({ ...homeData, destinations: newDestinations });
+  };
+
+  if (loading) return <div className="p-10 flex justify-center"><Loader2 className="animate-spin text-brand-primary w-8 h-8" /></div>;
+
+  return (
+    <div className="max-w-5xl space-y-8 pb-20 p-4 md:p-8">
+      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 border-b border-gray-200 pb-6">
+        <div>
+          <h2 className="text-2xl font-serif text-brand-text">Homepage Customization</h2>
+          <p className="text-gray-500 text-sm mt-1">Upload and update main showcase images directly to Cloudinary.</p>
+        </div>
+        <button 
+          onClick={handleSave} 
+          disabled={saving}
+          className="bg-brand-primary text-white px-6 py-3 rounded-lg font-bold tracking-widest uppercase text-sm flex items-center justify-center gap-2 hover:bg-[#A65520] transition-colors shadow-sm whitespace-nowrap"
+        >
+          {saving ? <Loader2 className="animate-spin w-4 h-4" /> : <Save className="w-4 h-4" />}
+          Publish to Live Site
+        </button>
+      </div>
+
+      {/* MAIN IMAGES SECTION */}
+      <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+        <div className="flex items-center gap-2 mb-6 border-b pb-2">
+          <ImageIcon className="text-brand-primary w-5 h-5" />
+          <h3 className="text-lg font-bold text-gray-800">Primary Showcase Images</h3>
+        </div>
+        <div className="space-y-8">
+          <div>
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-widest block mb-2">Hero Banner Image</label>
+            <CloudinaryUpload 
+              currentImage={homeData.heroImage} 
+              onUpload={(url) => setHomeData({...homeData, heroImage: url})} 
+            />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div>
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-widest block mb-2">King Size Room Image</label>
+              <CloudinaryUpload 
+                currentImage={homeData.kingSizeImage} 
+                onUpload={(url) => setHomeData({...homeData, kingSizeImage: url})} 
+              />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-widest block mb-2">Double Bed Room Image</label>
+              <CloudinaryUpload 
+                currentImage={homeData.doubleBedImage} 
+                onUpload={(url) => setHomeData({...homeData, doubleBedImage: url})} 
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* NEARBY DESTINATIONS SECTION */}
+      <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+        <div className="flex items-center gap-2 mb-6 border-b pb-2">
+          <MapPin className="text-brand-primary w-5 h-5" />
+          <h3 className="text-lg font-bold text-gray-800">Nearby Scenic Destinations</h3>
+        </div>
+        <p className="text-xs text-gray-400 uppercase tracking-widest font-bold mb-6">Edit the 4 featured locations on the homepage.</p>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {homeData.destinations.map((dest, index) => (
+            <div key={index} className="bg-gray-50 p-5 border border-gray-200 rounded-xl space-y-4">
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase">Location {index + 1} Name</label>
+                <input 
+                  type="text" 
+                  value={dest.name} 
+                  onChange={(e) => updateDestination(index, "name", e.target.value)} 
+                  className="w-full p-2.5 mt-1 border border-gray-300 rounded focus:border-brand-primary outline-none font-medium text-gray-800" 
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Upload New Image</label>
+                <CloudinaryUpload 
+                  currentImage={dest.img} 
+                  onUpload={(url) => updateDestination(index, "img", url)} 
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+    </div>
+  );
+}

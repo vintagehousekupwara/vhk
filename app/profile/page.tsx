@@ -9,7 +9,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   BedDouble, LogOut, Loader2, CalendarDays, Clock, 
   CheckCircle, XCircle, User as UserIcon, Mail, 
-  Utensils, ChefHat, Truck, MapPin, Phone, Calendar
+  Utensils, ChefHat, MapPin, Phone, Calendar
 } from "lucide-react";
 import Link from "next/link";
 
@@ -27,51 +27,78 @@ export default function ProfilePage() {
   // TAB STATE: 'profile' | 'rooms' | 'food'
   const [activeTab, setActiveTab] = useState<"profile" | "rooms" | "food">("profile");
 
+  // 1. AUTHENTICATION & USER DATA LISTENER
   useEffect(() => {
     const auth = getAuth(app);
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (!currentUser || !currentUser.emailVerified) {
+        // FIX: Explicitly clear user state to cleanly detach snapshot listeners
+        setUser(null); 
         router.push("/auth"); 
       } else {
-        if (currentUser.email === "admin@thevintagehouse.com") {
+        // Support for both potential admin emails
+        if (currentUser.email === "admin@thevintagehouse.com" || currentUser.email === "adminvintagesuperhouse@gmail.com") {
           router.push("/admin/rooms");
           return;
         }
+        
         setUser(currentUser);
 
-        const userDoc = await getDoc(doc(db, "users", currentUser.uid));
-        if (userDoc.exists()) setUserData(userDoc.data());
+        try {
+          const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+          if (userDoc.exists()) setUserData(userDoc.data());
+        } catch (error) {
+          console.error("Error fetching user profile:", error);
+        }
       }
     });
     return () => unsubscribe();
   }, [router]);
 
+  // 2. BOOKINGS & ORDERS LISTENER
   useEffect(() => {
     if (!user || !user.email) return;
 
+    // Bookings Query
     const qBookings = query(collection(db, "bookings"), where("email", "==", user.email));
     const unsubBookings = onSnapshot(qBookings, (snapshot) => {
       const fetchedBookings = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      fetchedBookings.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      fetchedBookings.sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
       setBookings(fetchedBookings);
+      setLoadingBookings(false);
+    }, (error) => {
+      // FIX: Graceful error handling prevents "Uncaught Error" crashes
+      console.error("Bookings Listener Error:", error);
       setLoadingBookings(false);
     });
 
+    // Food Orders Query
     const qFood = query(collection(db, "food_orders"), where("customer.email", "==", user.email));
     const unsubFood = onSnapshot(qFood, (snapshot) => {
       const fetchedFood = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       fetchedFood.sort((a: any, b: any) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
       setFoodOrders(fetchedFood);
       setLoadingFoodOrders(false);
+    }, (error) => {
+      // FIX: Graceful error handling
+      console.error("Food Orders Listener Error:", error);
+      setLoadingFoodOrders(false);
     });
 
-    return () => { unsubBookings(); unsubFood(); };
+    return () => { 
+      unsubBookings(); 
+      unsubFood(); 
+    };
   }, [user]);
 
   const handleSignOut = async () => {
-    const auth = getAuth(app);
-    await signOut(auth);
-    router.push("/");
+    try {
+      const auth = getAuth(app);
+      await signOut(auth);
+      router.push("/");
+    } catch (error) {
+      console.error("Sign out error:", error);
+    }
   };
 
   if (!user || !userData) {
@@ -112,7 +139,8 @@ export default function ProfilePage() {
                     <span className="absolute bottom-0 right-1 w-4 h-4 bg-green-500 border-2 border-white rounded-full"></span>
                   </div>
                   <div>
-                    <h1 className="font-serif text-2xl md:text-3xl text-brand-text mb-1">Hi, {userData.name.split(" ")[0]}</h1>
+                    {/* Safe split fallback in case name is undefined */}
+                    <h1 className="font-serif text-2xl md:text-3xl text-brand-text mb-1">Hi, {(userData?.name || "Guest").split(" ")[0]}</h1>
                     <span className="text-xs font-bold uppercase tracking-widest text-green-600 bg-green-100 px-2 py-1 rounded">Verified Guest</span>
                   </div>
                 </div>
@@ -127,28 +155,28 @@ export default function ProfilePage() {
                   <div className="p-3 bg-brand-bg rounded-lg"><Mail className="text-brand-primary" size={20} /></div>
                   <div>
                     <p className="text-[10px] uppercase font-bold text-gray-400 tracking-widest">Email Address</p>
-                    <p className="text-base text-gray-800 font-medium break-all">{userData.email}</p>
+                    <p className="text-base text-gray-800 font-medium break-all">{userData?.email || user.email}</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-4">
                   <div className="p-3 bg-brand-bg rounded-lg"><Phone className="text-brand-primary" size={20} /></div>
                   <div>
                     <p className="text-[10px] uppercase font-bold text-gray-400 tracking-widest">Phone Number</p>
-                    <p className="text-base text-gray-800 font-medium">{userData.phone}</p>
+                    <p className="text-base text-gray-800 font-medium">{userData?.phone || "Not Provided"}</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-4">
                   <div className="p-3 bg-brand-bg rounded-lg"><Calendar className="text-brand-primary" size={20} /></div>
                   <div>
                     <p className="text-[10px] uppercase font-bold text-gray-400 tracking-widest">Age</p>
-                    <p className="text-base text-gray-800 font-medium">{userData.age} Yrs</p>
+                    <p className="text-base text-gray-800 font-medium">{userData?.age ? `${userData.age} Yrs` : "Not Provided"}</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-4 sm:col-span-2">
                   <div className="p-3 bg-brand-bg rounded-lg"><MapPin className="text-brand-primary" size={20} /></div>
                   <div>
                     <p className="text-[10px] uppercase font-bold text-gray-400 tracking-widest">Delivery Address</p>
-                    <p className="text-base text-gray-800 font-medium leading-relaxed">{userData.address}</p>
+                    <p className="text-base text-gray-800 font-medium leading-relaxed">{userData?.address || "No address saved."}</p>
                   </div>
                 </div>
               </div>

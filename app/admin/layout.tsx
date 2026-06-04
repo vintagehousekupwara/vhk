@@ -341,6 +341,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: "Rooms", path: "/admin/rooms", icon: <BedDouble size={20} /> },
     { name: "Kitchen", path: "/admin/orders", icon: <UtensilsCrossed size={20} /> },
     { name: "Menu", path: "/admin/food", icon: <Settings size={20} /> },
+    { name: "Settings", path: "/admin/settings", icon: <Settings size={20} /> },
   ];
 
   return (

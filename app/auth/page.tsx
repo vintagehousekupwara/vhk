@@ -12,6 +12,8 @@ import { doc, setDoc, getDoc } from "firebase/firestore";
 import { app, db } from "@/lib/firebase";
 import { Loader2, Mail, Lock, User, Phone, MapPin, Calendar } from "lucide-react";
 
+const ADMIN_EMAILS = ["admin@thevintagehouse.com", "adminvintagesuperhouse@gmail.com"];
+
 export default function AuthPage() {
   const router = useRouter();
   const auth = getAuth(app);
@@ -21,7 +23,6 @@ export default function AuthPage() {
   const [isInitializing, setIsInitializing] = useState(true); 
   const [error, setError] = useState("");
   
-  // FIX: This blocks Firebase's background listener from hijacking the screen while we are actively saving data.
   const isHandlingAuth = useRef(false);
 
   const [formData, setFormData] = useState({
@@ -31,20 +32,23 @@ export default function AuthPage() {
   const [tempUid, setTempUid] = useState<string | null>(null);
 
   useEffect(() => {
-    // FIX: Strictly enforce Local Caching. The user stays logged in across tabs and reloads until cache is cleared.
     setPersistence(auth, browserLocalPersistence).catch(console.error);
 
     const unsub = onAuthStateChanged(auth, async (user) => {
-      // If our manual sign-up/login buttons are working, ignore this automatic background check.
       if (isHandlingAuth.current) return;
 
       if (user) {
+        // ADMIN INTERCEPT: Redirect admins instantly to dashboard
+        if (user.email && ADMIN_EMAILS.includes(user.email.toLowerCase())) {
+          router.replace("/admin/rooms");
+          return;
+        }
+
         try {
           const docRef = doc(db, "users", user.uid);
           const docSnap = await getDoc(docRef);
           
           if (docSnap.exists() && docSnap.data().address) {
-            // User is fully logged in and cached -> Send directly to profile
             router.replace("/profile");
           } else {
             setFormData(prev => ({ ...prev, name: user.displayName || "", email: user.email || "" }));
@@ -56,7 +60,6 @@ export default function AuthPage() {
           setIsInitializing(false);
         }
       } else {
-        // No cached user found (or cache was cleared), show the login screen
         setIsInitializing(false);
       }
     });
@@ -71,13 +74,19 @@ export default function AuthPage() {
   const handleEmailSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true); setError("");
-    isHandlingAuth.current = true; // Block background hijacks
+    isHandlingAuth.current = true; 
 
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
       const user = userCredential.user;
 
       await updateProfile(user, { displayName: formData.name });
+
+      // ADMIN INTERCEPT
+      if (user.email && ADMIN_EMAILS.includes(user.email.toLowerCase())) {
+        router.replace("/admin/rooms");
+        return;
+      }
 
       await setDoc(doc(db, "users", user.uid), {
         name: formData.name,
@@ -99,16 +108,23 @@ export default function AuthPage() {
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true); setError("");
-    isHandlingAuth.current = true; // Block background hijacks
+    isHandlingAuth.current = true;
 
     try {
       const userCredential = await signInWithEmailAndPassword(auth, formData.email, formData.password);
-      const docSnap = await getDoc(doc(db, "users", userCredential.user.uid));
+      const user = userCredential.user;
 
+      // ADMIN INTERCEPT
+      if (user.email && ADMIN_EMAILS.includes(user.email.toLowerCase())) {
+        router.replace("/admin/rooms");
+        return;
+      }
+
+      const docSnap = await getDoc(doc(db, "users", user.uid));
       if (docSnap.exists() && docSnap.data().address) {
         router.replace("/profile");
       } else {
-        setTempUid(userCredential.user.uid);
+        setTempUid(user.uid);
         setMode("complete_profile");
         setLoading(false);
         isHandlingAuth.current = false;
@@ -122,16 +138,23 @@ export default function AuthPage() {
 
   const handleGoogleAuth = async () => {
     setLoading(true); setError("");
-    isHandlingAuth.current = true; // Block background hijacks
+    isHandlingAuth.current = true;
     
     try {
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+
+      // ADMIN INTERCEPT
+      if (user.email && ADMIN_EMAILS.includes(user.email.toLowerCase())) {
+        router.replace("/admin/rooms");
+        return;
+      }
       
-      const userDoc = await getDoc(doc(db, "users", result.user.uid));
+      const userDoc = await getDoc(doc(db, "users", user.uid));
       if (!userDoc.exists() || !userDoc.data().address) {
-        setFormData(prev => ({ ...prev, name: result.user.displayName || "", email: result.user.email || "" }));
-        setTempUid(result.user.uid);
+        setFormData(prev => ({ ...prev, name: user.displayName || "", email: user.email || "" }));
+        setTempUid(user.uid);
         setMode("complete_profile");
         setLoading(false);
         isHandlingAuth.current = false;
@@ -167,7 +190,6 @@ export default function AuthPage() {
     } 
   };
 
-  // Seamless loader while checking browser cache
   if (isInitializing) {
     return (
       <main className="min-h-screen bg-brand-bg flex items-center justify-center">

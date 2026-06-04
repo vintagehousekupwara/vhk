@@ -16,6 +16,8 @@ const NAV_LINKS = [
   { name: "About", path: "/about" },
 ];
 
+const ADMIN_EMAILS = ["admin@thevintagehouse.com", "adminvintagesuperhouse@gmail.com"];
+
 export default function Navbar() {
   const { scrollY } = useScroll();
   const [isScrolled, setIsScrolled] = useState(false);
@@ -27,19 +29,26 @@ export default function Navbar() {
   const cartTotal = cart.reduce((total, item) => total + (item.price * item.quantity), 0);
 
   const [userName, setUserName] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   
-  // Mounted state prevents Hydration Mismatch errors
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
     const auth = getAuth(app);
     const unsub = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        const firstName = user.displayName ? user.displayName.split(" ")[0] : "Guest";
-        setUserName(firstName);
+      if (user && user.email) {
+        if (ADMIN_EMAILS.includes(user.email.toLowerCase())) {
+          setIsAdmin(true);
+          setUserName("Admin");
+        } else {
+          setIsAdmin(false);
+          const firstName = user.displayName ? user.displayName.split(" ")[0] : "Guest";
+          setUserName(firstName);
+        }
       } else {
         setUserName(null);
+        setIsAdmin(false);
       }
     });
     return () => unsub();
@@ -77,7 +86,6 @@ export default function Navbar() {
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 flex justify-between items-center w-full">
           
-          {/* Logo Section */}
           <Link href="/" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-2 sm:gap-3 group shrink-0">
             <div className="relative w-9 h-9 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-full overflow-hidden border border-brand-primary/50 group-hover:border-brand-primary transition-colors shrink-0">
               <Image 
@@ -99,7 +107,6 @@ export default function Navbar() {
             </div>
           </Link>
 
-          {/* Desktop Center Links */}
           <div className="hidden md:flex items-center space-x-8 lg:space-x-10 text-sm font-medium tracking-widest uppercase">
             {NAV_LINKS.map((link, index) => (
               <motion.div key={link.name} initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: index * 0.1 + 0.3 }}>
@@ -111,10 +118,8 @@ export default function Navbar() {
             ))}
           </div>
 
-          {/* Right Action Icons (Optimized for Mobile & Tablet) */}
           <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.5, delay: 0.7 }} className="flex items-center gap-3 sm:gap-4 shrink-0">
             
-            {/* Desktop-Only Book Button */}
             <Link href="/book" className="hidden md:block">
               <button className="bg-brand-text text-brand-bg px-6 lg:px-8 py-2.5 rounded-none border border-brand-text hover:bg-brand-primary hover:border-brand-primary transition-all duration-300 text-sm uppercase tracking-widest font-medium overflow-hidden relative group">
                 <span className="relative z-10">Book Now</span>
@@ -122,27 +127,27 @@ export default function Navbar() {
               </button>
             </Link>
             
-            {/* Account Icon (Visible on Mobile & Desktop) */}
-            <Link href="/auth" className="flex items-center">
-              {mounted ? (
-                <motion.div 
-                  whileHover={{ scale: 1.05 }}
-                  className={`flex items-center gap-2 p-2 md:px-3 md:py-1.5 rounded-full border transition-all duration-300 ${userName ? 'bg-green-50 border-green-200 text-green-700' : 'bg-brand-secondary/30 border-transparent text-brand-text hover:bg-brand-primary hover:text-white'}`}
-                  aria-label="Account"
-                >
-                  <div className="relative flex items-center justify-center">
-                    <User size={18} className="sm:w-5 sm:h-5" />
-                    {userName && <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-green-500 border-2 border-white rounded-full"></span>}
-                  </div>
-                  {/* Name only shows on desktop screens */}
-                  {userName && <span className="hidden md:inline text-xs font-bold uppercase tracking-widest">{userName}</span>}
-                </motion.div>
-              ) : (
-                <div className="w-9 h-9 md:w-24 md:h-9 rounded-full bg-brand-secondary/30 animate-pulse"></div>
-              )}
-            </Link>
+            {/* Account Icon (HIDDEN for Admin) */}
+            {!isAdmin && (
+              <Link href="/auth" className="flex items-center">
+                {mounted ? (
+                  <motion.div 
+                    whileHover={{ scale: 1.05 }}
+                    className={`flex items-center gap-2 p-2 md:px-3 md:py-1.5 rounded-full border transition-all duration-300 ${userName ? 'bg-green-50 border-green-200 text-green-700' : 'bg-brand-secondary/30 border-transparent text-brand-text hover:bg-brand-primary hover:text-white'}`}
+                    aria-label="Account"
+                  >
+                    <div className="relative flex items-center justify-center">
+                      <User size={18} className="sm:w-5 sm:h-5" />
+                      {userName && <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-green-500 border-2 border-white rounded-full"></span>}
+                    </div>
+                    {userName && <span className="hidden md:inline text-xs font-bold uppercase tracking-widest">{userName}</span>}
+                  </motion.div>
+                ) : (
+                  <div className="w-9 h-9 md:w-24 md:h-9 rounded-full bg-brand-secondary/30 animate-pulse"></div>
+                )}
+              </Link>
+            )}
 
-            {/* Cart Icon (Visible on Mobile & Desktop) */}
             <button onClick={() => setIsCartOpen(true)} className="relative p-2 text-brand-text hover:text-brand-primary transition-colors flex items-center justify-center" aria-label="Open Cart">
               <ShoppingBag size={22} className="sm:w-6 sm:h-6" />
               {cartItemCount > 0 && mounted && (
@@ -152,7 +157,6 @@ export default function Navbar() {
               )}
             </button>
 
-            {/* Mobile Hamburger Menu */}
             <button className="md:hidden text-brand-text relative z-[60] p-1.5 shrink-0 hover:text-brand-primary transition-colors" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} aria-label="Toggle Menu">
               {mobileMenuOpen ? <X size={26} /> : <Menu size={26} />}
             </button>
@@ -160,7 +164,6 @@ export default function Navbar() {
           </motion.div>
         </div>
 
-        {/* Fullscreen Mobile Menu (When Hamburger is clicked) */}
         <AnimatePresence>
           {mobileMenuOpen && (
             <motion.div 
@@ -175,17 +178,20 @@ export default function Navbar() {
                 </motion.div>
               ))}
               
-              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: NAV_LINKS.length * 0.1 + 0.2 }}>
-                <Link href="/auth" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3">
-                  <div className="relative">
-                    <User size={28} className={mounted && userName ? "text-green-600" : "text-brand-text"} />
-                    {mounted && userName && <span className="absolute top-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></span>}
-                  </div>
-                  <span className={`text-3xl font-serif tracking-wider ${mounted && userName ? "text-green-600 font-bold" : "text-brand-text"}`}>
-                    {mounted && userName ? `Hi, ${userName}` : "Account"}
-                  </span>
-                </Link>
-              </motion.div>
+              {/* HIDDEN FOR ADMIN */}
+              {!isAdmin && (
+                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: NAV_LINKS.length * 0.1 + 0.2 }}>
+                  <Link href="/auth" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3">
+                    <div className="relative">
+                      <User size={28} className={mounted && userName ? "text-green-600" : "text-brand-text"} />
+                      {mounted && userName && <span className="absolute top-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></span>}
+                    </div>
+                    <span className={`text-3xl font-serif tracking-wider ${mounted && userName ? "text-green-600 font-bold" : "text-brand-text"}`}>
+                      {mounted && userName ? `Hi, ${userName}` : "Account"}
+                    </span>
+                  </Link>
+                </motion.div>
+              )}
 
               <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.6 }} className="pt-8">
                 <Link href="/book" onClick={() => setMobileMenuOpen(false)}>
@@ -244,8 +250,8 @@ export default function Navbar() {
                 )}
               </div>
 
-              {/* Guest Warning Banner */}
-              {!userEmail && cart.length > 0 && (
+              {/* Guest Warning Banner (HIDDEN FOR ADMIN) */}
+              {!userEmail && !isAdmin && cart.length > 0 && (
                 <div className="bg-brand-primary/10 border-y border-brand-primary/20 px-4 md:px-6 py-4 flex items-center gap-3 md:gap-4">
                   <User size={20} className="text-brand-primary shrink-0 hidden sm:block" />
                   <div>

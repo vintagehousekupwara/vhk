@@ -43,6 +43,12 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**', 
       },
+      {
+        protocol: 'https',
+        hostname: 'upload.wikimedia.org', // Added for fallback avatar
+        port: '',
+        pathname: '/**', 
+      },
     ],
   },
   // This header configuration allows Firebase Google Sign-In popups to work in Next 15
