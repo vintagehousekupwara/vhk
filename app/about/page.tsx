@@ -49,7 +49,7 @@ const fadeInUp: Variants = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.8, ease: "easeOut" } }
 };
 
-const staggerContainer = {
+const staggerContainer: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
@@ -74,7 +74,6 @@ export default function AboutPage() {
       
       {/* 1. HERO SECTION */}
       <section className="relative w-full h-[70vh] min-h-[500px] flex items-center justify-center overflow-hidden">
-        {/* New Premium Image */}
         <motion.div 
           initial={{ scale: 1.1 }}
           animate={{ scale: 1 }}
@@ -173,7 +172,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* 3. FOUNDER's NOTE */}
+      {/* 3. FOUNDER's NOTE & MOTIVE (SEO Optimized) */}
       <section className="py-24 bg-white border-y border-brand-secondary/30 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-64 bg-brand-secondary/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
         <div className="absolute bottom-0 left-0 w-80 h-80 bg-brand-primary/5 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2 pointer-events-none" />
@@ -190,14 +189,22 @@ export default function AboutPage() {
               "A sanctuary built on the foundations of <span className="italic text-brand-primary">Kashmiri warmth</span> and uncompromising modern luxury."
             </h2>
             
-            <p className="text-brand-muted md:text-lg font-light leading-relaxed mb-12">
-              When we first envisioned The Vintage House, our goal was remarkably simple yet deeply ambitious: to create a space in Kupwara that offers world-class hospitality without losing the soul of our local culture. Every corner of this property—from our premium suites to the culinary creations in our kitchen—has been crafted with profound attention to detail. We invite you to step inside, relax, and allow our dedicated team to make your stay truly exceptional.
-            </p>
+            <div className="text-brand-muted md:text-lg font-light leading-relaxed mb-12 space-y-6 text-left md:text-center">
+              <p>
+                Welcome to The Vintage House Kupwara, a vision born from a deep love for our homeland and a passion for redefining hospitality in North Kashmir. My core motive was simple yet ambitious: to bridge the gap in high-end accommodation by creating the finest luxury hotel in Kupwara, where authentic traditional hospitality seamlessly blends with modern elegance.
+              </p>
+              <p>
+                Every element of this property—from our meticulously designed premium suites to the culinary artistry in our fine-dining restaurant—has been crafted with profound attention to detail. We are dedicated to providing a secure, comfortable, and world-class stay for travelers, business professionals, and families exploring the breathtaking beauty of Kashmir.
+              </p>
+              <p className="font-medium text-brand-text text-center text-xl pt-4">
+                Discover your perfect stay at <a href="https://vintagehousekupwara.com" target="_blank" rel="noopener noreferrer" className="text-brand-primary hover:text-[#A65520] hover:underline underline-offset-4 font-bold transition-all">vintagehousekupwara.com</a>
+              </p>
+            </div>
 
             <div className="flex flex-col items-center justify-center">
               <div className="w-16 h-[1px] bg-gray-300 mb-6" />
-              <h4 className="font-serif text-2xl text-brand-text font-bold">The Management</h4>
-              <p className="text-xs tracking-[0.2em] text-brand-primary uppercase mt-2 font-bold">Founders, The Vintage House</p>
+              <h4 className="font-serif text-2xl text-brand-text font-bold">Suhail Ahmad War</h4>
+              <p className="text-xs tracking-[0.2em] text-brand-primary uppercase mt-2 font-bold">Founder & CEO, The Vintage House</p>
             </div>
           </motion.div>
         </div>
