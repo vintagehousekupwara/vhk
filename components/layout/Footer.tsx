@@ -55,7 +55,7 @@ export default function Footer() {
         <div className="flex flex-col lg:flex-row items-center justify-between pb-12 border-b border-white/10 gap-8 text-center lg:text-left">
           <div>
             <h2 className="font-serif text-4xl md:text-5xl text-white mb-3 tracking-wide">
-              The <span className="text-[#DE9C3A] italic font-light">Vintage</span> Experience
+              The <span className="text-[#DE9C3A] italic font-light">Vintage</span> House Kupwara
             </h2>
             <p className="text-[#DE9C3A] tracking-widest uppercase text-xs font-bold">
               Stay • Dine • Celebrate
@@ -78,14 +78,42 @@ export default function Footer() {
             <p className="text-gray-300 text-sm leading-relaxed mb-8 max-w-sm font-light">
               Redefining rustic elegance and world-class culinary mastery in the heart of the city. A sanctuary of luxury and comfort.
             </p>
-            <div className="flex space-x-4">
-              <a href="#" className="w-11 h-11 rounded-full border border-gray-500 flex items-center justify-center hover:bg-[#DE9C3A] hover:border-[#DE9C3A] hover:text-[#153932] text-gray-300 transition-all duration-300">
-                <InstagramIcon size={18} />
-              </a>
-              <a href="#" className="w-11 h-11 rounded-full border border-gray-500 flex items-center justify-center hover:bg-[#DE9C3A] hover:border-[#DE9C3A] hover:text-[#153932] text-gray-300 transition-all duration-300">
-                <FacebookIcon size={18} />
-              </a>
+            
+            {/* Social Links & 12k+ Followers Highlight */}
+            <div className="flex items-center gap-4">
+              <div className="flex space-x-3">
+                <a 
+                  href="https://www.instagram.com/vintagehousekupwara" 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="w-11 h-11 rounded-full border border-gray-500 flex items-center justify-center hover:bg-[#DE9C3A] hover:border-[#DE9C3A] hover:text-[#153932] text-gray-300 transition-all duration-300"
+                  aria-label="Follow us on Instagram"
+                >
+                  <InstagramIcon size={18} />
+                </a>
+                <a 
+                  href="https://www.facebook.com/MrSuhailwar" 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="w-11 h-11 rounded-full border border-gray-500 flex items-center justify-center hover:bg-[#DE9C3A] hover:border-[#DE9C3A] hover:text-[#153932] text-gray-300 transition-all duration-300"
+                  aria-label="Follow us on Facebook"
+                >
+                  <FacebookIcon size={18} />
+                </a>
+              </div>
+              
+              {/* Highlight Badge */}
+              <div className="px-3 py-1.5 bg-[#DE9C3A]/10 border border-[#DE9C3A]/30 rounded-full shadow-[0_0_15px_rgba(222,156,58,0.15)] flex items-center group cursor-default transition-all duration-300 hover:bg-[#DE9C3A]/20">
+                <span className="text-[#DE9C3A] text-[10px] md:text-xs font-bold tracking-widest uppercase flex items-center gap-2">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#DE9C3A] opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-[#DE9C3A]"></span>
+                  </span>
+                  12k+ Followers
+                </span>
+              </div>
             </div>
+
           </div>
 
           <div className="lg:col-span-4 flex flex-col items-center md:items-start text-center md:text-left">

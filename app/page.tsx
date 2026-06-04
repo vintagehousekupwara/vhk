@@ -1,4 +1,5 @@
 import HomeClient from "@/components/Home/HomeClient";
+import FrontendPopup from "@/components/Home/FrontendPopup";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
@@ -52,6 +53,9 @@ export default async function HomePage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
+      
+      {/* The real-time delay pop-up component */}
+      <FrontendPopup />
       
       {/* Push content down below the fixed navbar */}
       <div className="pt-24 md:pt-24">

@@ -3,7 +3,15 @@
 import { useState, useEffect } from "react";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Loader2, Save, Image as ImageIcon, MapPin, UploadCloud } from "lucide-react";
+import { 
+  Loader2, 
+  Save, 
+  Image as ImageIcon, 
+  MapPin, 
+  UploadCloud, 
+  Megaphone, 
+  BellRing 
+} from "lucide-react";
 import { purgeWebsiteCache } from "@/app/actions/cache";
 
 // --- REUSABLE CLOUDINARY UPLOAD COMPONENT ---
@@ -18,7 +26,6 @@ const CloudinaryUpload = ({ currentImage, onUpload }: { currentImage: string, on
     const formData = new FormData();
     formData.append("file", file);
     
-    // Automatically pulling from your .env.local
     formData.append("upload_preset", process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET as string); 
 
     try {
@@ -76,7 +83,26 @@ const DEFAULT_HOME_DATA = {
     { name: "Bungus Valley", img: "https://res.cloudinary.com/dfdnjuhpw/image/upload/q_auto/f_auto/v1780469195/bungus_valley_fsuopv.jpg" },
     { name: "Sharda Mandir", img: "https://res.cloudinary.com/dfdnjuhpw/image/upload/q_auto/f_auto/v1780495015/2024_7_largeimg_476843546_ubb7dv.jpg" },
     { name: "Lolab Valley", img: "https://res.cloudinary.com/dfdnjuhpw/image/upload/q_auto/f_auto/v1780497987/0_lryde3.jpg" }
-  ]
+  ],
+  // NEW: Banner Defaults
+  announcementBanner: {
+    enabled: false,
+    text: "Restaurant is temporarily closed today for private event.",
+    bgColor: "#dc2626", // Red-600 default
+    textColor: "#ffffff",
+    linkText: "Read More",
+    linkUrl: "/about"
+  },
+  // NEW: Pop-up Defaults
+  frontendPopup: {
+    enabled: false,
+    title: "Special Winter Offer!",
+    message: "Get 20% off on all Premium Room bookings this weekend. Limited availability.",
+    image: "",
+    buttonText: "Book Now",
+    buttonUrl: "/book",
+    delay: 3 // Delay in seconds before it shows
+  }
 };
 
 export default function AdminHomepageSettings() {
@@ -88,7 +114,14 @@ export default function AdminHomepageSettings() {
     const fetchSettings = async () => {
       const docSnap = await getDoc(doc(db, "settings", "homepage"));
       if (docSnap.exists()) {
-        setHomeData({ ...DEFAULT_HOME_DATA, ...docSnap.data() });
+        const data = docSnap.data();
+        // Deep merge to ensure nested objects like announcementBanner aren't overwritten if they don't exist in DB yet
+        setHomeData({ 
+          ...DEFAULT_HOME_DATA, 
+          ...data,
+          announcementBanner: { ...DEFAULT_HOME_DATA.announcementBanner, ...(data.announcementBanner || {}) },
+          frontendPopup: { ...DEFAULT_HOME_DATA.frontendPopup, ...(data.frontendPopup || {}) }
+        });
       }
       setLoading(false);
     };
@@ -115,6 +148,14 @@ export default function AdminHomepageSettings() {
     setHomeData({ ...homeData, destinations: newDestinations });
   };
 
+  const updateBanner = (field: string, value: string | boolean) => {
+    setHomeData({ ...homeData, announcementBanner: { ...homeData.announcementBanner, [field]: value } });
+  };
+
+  const updatePopup = (field: string, value: string | boolean | number) => {
+    setHomeData({ ...homeData, frontendPopup: { ...homeData.frontendPopup, [field]: value } });
+  };
+
   if (loading) return <div className="p-10 flex justify-center"><Loader2 className="animate-spin text-brand-primary w-8 h-8" /></div>;
 
   return (
@@ -122,7 +163,7 @@ export default function AdminHomepageSettings() {
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 border-b border-gray-200 pb-6">
         <div>
           <h2 className="text-2xl font-serif text-brand-text">Homepage Customization</h2>
-          <p className="text-gray-500 text-sm mt-1">Upload and update main showcase images directly to Cloudinary.</p>
+          <p className="text-gray-500 text-sm mt-1">Manage global banners, pop-ups, and main showcase images.</p>
         </div>
         <button 
           onClick={handleSave} 
@@ -134,7 +175,112 @@ export default function AdminHomepageSettings() {
         </button>
       </div>
 
-      {/* MAIN IMAGES SECTION */}
+      {/* 1. GLOBAL ANNOUNCEMENT BANNER */}
+      <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+        <div className="flex items-center justify-between mb-6 border-b pb-2">
+          <div className="flex items-center gap-2">
+            <Megaphone className="text-brand-primary w-5 h-5" />
+            <h3 className="text-lg font-bold text-gray-800">Global Announcement Banner</h3>
+          </div>
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" checked={homeData.announcementBanner.enabled} onChange={(e) => updateBanner("enabled", e.target.checked)} className="sr-only peer" />
+            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+            <span className="ml-3 text-sm font-bold uppercase tracking-wider text-gray-600">
+              {homeData.announcementBanner.enabled ? "Active" : "Hidden"}
+            </span>
+          </label>
+        </div>
+        
+        <div className={`space-y-6 transition-opacity ${!homeData.announcementBanner.enabled && 'opacity-50 pointer-events-none'}`}>
+          <div>
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-widest block mb-2">Banner Message</label>
+            <input type="text" value={homeData.announcementBanner.text} onChange={(e) => updateBanner("text", e.target.value)} placeholder="e.g., The restaurant is closed today." className="w-full p-3 border border-gray-300 rounded focus:border-brand-primary outline-none font-medium text-gray-800" />
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div>
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-widest block mb-2">Background Color</label>
+              <div className="flex items-center gap-3">
+                <input type="color" value={homeData.announcementBanner.bgColor} onChange={(e) => updateBanner("bgColor", e.target.value)} className="h-10 w-10 cursor-pointer border border-gray-300 rounded" />
+                <span className="text-sm text-gray-600 font-mono">{homeData.announcementBanner.bgColor}</span>
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-widest block mb-2">Text Color</label>
+              <div className="flex items-center gap-3">
+                <input type="color" value={homeData.announcementBanner.textColor} onChange={(e) => updateBanner("textColor", e.target.value)} className="h-10 w-10 cursor-pointer border border-gray-300 rounded" />
+                <span className="text-sm text-gray-600 font-mono">{homeData.announcementBanner.textColor}</span>
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-widest block mb-2">Link Text (Optional)</label>
+              <input type="text" value={homeData.announcementBanner.linkText} onChange={(e) => updateBanner("linkText", e.target.value)} placeholder="e.g., Read More" className="w-full p-2.5 border border-gray-300 rounded focus:border-brand-primary outline-none text-sm font-medium text-gray-800" />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-widest block mb-2">Link URL (Optional)</label>
+              <input type="text" value={homeData.announcementBanner.linkUrl} onChange={(e) => updateBanner("linkUrl", e.target.value)} placeholder="e.g., /contact" className="w-full p-2.5 border border-gray-300 rounded focus:border-brand-primary outline-none text-sm font-medium text-gray-800" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. FRONTEND POP-UP */}
+      <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+        <div className="flex items-center justify-between mb-6 border-b pb-2">
+          <div className="flex items-center gap-2">
+            <BellRing className="text-brand-primary w-5 h-5" />
+            <h3 className="text-lg font-bold text-gray-800">Frontend Pop-up Settings</h3>
+          </div>
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" checked={homeData.frontendPopup.enabled} onChange={(e) => updatePopup("enabled", e.target.checked)} className="sr-only peer" />
+            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-primary"></div>
+            <span className="ml-3 text-sm font-bold uppercase tracking-wider text-gray-600">
+              {homeData.frontendPopup.enabled ? "Active" : "Hidden"}
+            </span>
+          </label>
+        </div>
+        
+        <div className={`space-y-6 transition-opacity ${!homeData.frontendPopup.enabled && 'opacity-50 pointer-events-none'}`}>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-6">
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest block mb-2">Pop-up Title</label>
+                <input type="text" value={homeData.frontendPopup.title} onChange={(e) => updatePopup("title", e.target.value)} className="w-full p-3 border border-gray-300 rounded focus:border-brand-primary outline-none font-medium text-gray-800" />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest block mb-2">Message</label>
+                <textarea rows={3} value={homeData.frontendPopup.message} onChange={(e) => updatePopup("message", e.target.value)} className="w-full p-3 border border-gray-300 rounded focus:border-brand-primary outline-none font-medium text-gray-800" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-widest block mb-2">Button Text</label>
+                  <input type="text" value={homeData.frontendPopup.buttonText} onChange={(e) => updatePopup("buttonText", e.target.value)} className="w-full p-2.5 border border-gray-300 rounded focus:border-brand-primary outline-none text-sm font-medium text-gray-800" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-widest block mb-2">Button URL</label>
+                  <input type="text" value={homeData.frontendPopup.buttonUrl} onChange={(e) => updatePopup("buttonUrl", e.target.value)} className="w-full p-2.5 border border-gray-300 rounded focus:border-brand-primary outline-none text-sm font-medium text-gray-800" />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest block mb-2">Delay (Seconds before showing)</label>
+                <input type="number" min="0" value={homeData.frontendPopup.delay} onChange={(e) => updatePopup("delay", Number(e.target.value))} className="w-full max-w-[150px] p-2.5 border border-gray-300 rounded focus:border-brand-primary outline-none text-sm font-medium text-gray-800" />
+              </div>
+            </div>
+            
+            <div className="bg-gray-50 p-5 rounded-xl border border-gray-200 flex flex-col justify-center">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-widest block mb-2">Pop-up Image (Optional)</label>
+              <CloudinaryUpload 
+                currentImage={homeData.frontendPopup.image} 
+                onUpload={(url) => updatePopup("image", url)} 
+              />
+              <p className="text-xs text-gray-400 mt-4 leading-relaxed">Adding a high-quality image helps convert visitors. Leave empty for a text-only pop-up.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+
+      {/* 3. MAIN IMAGES SECTION */}
       <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
         <div className="flex items-center gap-2 mb-6 border-b pb-2">
           <ImageIcon className="text-brand-primary w-5 h-5" />
@@ -167,7 +313,7 @@ export default function AdminHomepageSettings() {
         </div>
       </div>
 
-      {/* NEARBY DESTINATIONS SECTION */}
+      {/* 4. NEARBY DESTINATIONS SECTION */}
       <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
         <div className="flex items-center gap-2 mb-6 border-b pb-2">
           <MapPin className="text-brand-primary w-5 h-5" />

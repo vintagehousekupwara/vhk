@@ -57,6 +57,50 @@ const staggerContainer: Variants = {
   }
 };
 
+// --- SEO Optimized Gallery Images Array ---
+const galleryImages = [
+  { 
+    src: "https://res.cloudinary.com/dfdnjuhpw/image/upload/q_auto/f_auto/v1780575946/photo_5_2026-06-04_17-54-19_z17fwv.jpg", 
+    alt: "The Vintage House Kupwara - Luxury Hotel Rooms and Premium Suites View" 
+  },
+  { 
+    src: "https://res.cloudinary.com/dfdnjuhpw/image/upload/q_auto/f_auto/v1780575946/photo_2_2026-06-04_17-54-19_li2lgx.jpg", 
+    alt: "Vintage House Kupwara - Premium Accommodation and Hospitality in North Kashmir" 
+  },
+  { 
+    src: "https://res.cloudinary.com/dfdnjuhpw/image/upload/q_auto/f_auto/v1780575946/photo_1_2026-06-04_17-54-19_vvhry1.jpg", 
+    alt: "Vintage Kupwara - Best Hotel in Kupwara Experience and Services" 
+  },
+  { 
+    src: "https://res.cloudinary.com/dfdnjuhpw/image/upload/q_auto/f_auto/v1780575945/photo_3_2026-06-04_17-54-19_fhviaz.jpg", 
+    alt: "Kupwara Vintage House - Beautiful Exterior Architecture and Interior Design" 
+  },
+  { 
+    src: "https://res.cloudinary.com/dfdnjuhpw/image/upload/q_auto/f_auto/v1780575945/photo_6_2026-06-04_17-54-19_p4bdcc.jpg", 
+    alt: "The Vintage House Kupwara - Elegant Fine Dining, Restaurant and Family Meals" 
+  },
+  { 
+    src: "https://res.cloudinary.com/dfdnjuhpw/image/upload/q_auto/f_auto/v1780575945/photo_9_2026-06-04_17-54-19_y4t6nt.jpg", 
+    alt: "Vintage House Kupwara Hotel - Conference Hall, Events, and Corporate Meetings Setup" 
+  },
+  { 
+    src: "https://res.cloudinary.com/dfdnjuhpw/image/upload/q_auto/f_auto/v1780575945/photo_4_2026-06-04_17-54-19_om13fe.jpg", 
+    alt: "Vintage Kupwara Resort - Comfortable Stays for Families and Tourists Visiting Kashmir" 
+  },
+  { 
+    src: "https://res.cloudinary.com/dfdnjuhpw/image/upload/q_auto/f_auto/v1780575945/photo_10_2026-06-04_17-54-19_tv37ky.jpg", 
+    alt: "Kupwara Vintage House - Luxury Amenities, Hotel Services and Secure Environment" 
+  },
+  { 
+    src: "https://res.cloudinary.com/dfdnjuhpw/image/upload/q_auto/f_auto/v1780575944/photo_7_2026-06-04_17-54-19_u77gqe.jpg", 
+    alt: "The Vintage House Kupwara North Kashmir - Most Scenic Place to Stay near JIC Branwari" 
+  },
+  { 
+    src: "https://res.cloudinary.com/dfdnjuhpw/image/upload/q_auto/f_auto/v1780575944/photo_8_2026-06-04_17-54-19_qpz12o.jpg", 
+    alt: "Vintage House Kupwara - Exploring Authentic Kashmiri Hospitality and Modern Elegance" 
+  }
+];
+
 export default function AboutPage() {
   const facilities = [
     { icon: <Building size={28} />, title: "9 Premium Rooms", desc: "Luxury AC & Non-AC rooms designed for absolute comfort and relaxation." },
@@ -82,7 +126,8 @@ export default function AboutPage() {
         >
           <Image
             src="https://images.unsplash.com/photo-1566665797739-1674de7a421a?q=80&w=2000&auto=format&fit=crop"
-            alt="The Vintage House Luxury Interior"
+            alt="The Vintage House Kupwara Luxury Interior Design"
+            title="The Vintage House Kupwara"
             fill
             priority
             className="object-cover"
@@ -172,7 +217,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* 3. FOUNDER's NOTE & MOTIVE (SEO Optimized) */}
+      {/* 3. FOUNDER's NOTE & MOTIVE */}
       <section className="py-24 bg-white border-y border-brand-secondary/30 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-64 bg-brand-secondary/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
         <div className="absolute bottom-0 left-0 w-80 h-80 bg-brand-primary/5 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2 pointer-events-none" />
@@ -283,7 +328,57 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* 6. CTA */}
+      {/* 6. PHOTO GALLERY (SEO Optimized & Lazy Loaded) */}
+      <section className="py-24 bg-brand-bg relative z-10 border-t border-brand-secondary/20">
+        <div className="max-w-7xl mx-auto px-6 lg:px-24">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="text-center mb-16"
+          >
+            <span className="uppercase tracking-[0.3em] text-brand-primary text-xs font-bold">Visual Journey</span>
+            <h2 className="font-serif text-4xl md:text-5xl text-brand-text mt-4 mb-6">Gallery at The Vintage House</h2>
+            <p className="text-brand-muted max-w-2xl mx-auto font-light md:text-lg">
+              A glimpse into the elegance, luxury, and warmth that awaits you at Kupwara's finest destination.
+            </p>
+          </motion.div>
+
+          <motion.div 
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: "100px" }} // Lazy-triggers animation when nearby
+            variants={staggerContainer}
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6"
+          >
+            {galleryImages.map((image, index) => (
+              <motion.div
+                variants={fadeInUp}
+                key={index}
+                className={`relative group overflow-hidden rounded-xl shadow-luxury border border-brand-secondary/30 bg-white ${
+                  // Make some images span 2 columns to create an elegant bento-box frame layout
+                  index === 0 || index === 7 ? 'sm:col-span-2 lg:col-span-2' : ''
+                }`}
+                style={{ aspectRatio: index === 0 || index === 7 ? '16/9' : '4/3' }}
+              >
+                <Image
+                  src={image.src}
+                  alt={image.alt}       // Vital for SEO searchability
+                  title={image.alt}     // Tooltip enhancement for SEO 
+                  fill
+                  loading="lazy"        // Explicitly prevents images from loading before scrolling down
+                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                  className="object-cover transform group-hover:scale-105 transition-transform duration-700 ease-in-out"
+                />
+                {/* Visual Frame Overlay on Hover */}
+                <div className="absolute inset-0 bg-black/10 group-hover:bg-black/0 transition-colors duration-500 pointer-events-none" />
+              </motion.div>
+            ))}
+          </motion.div>
+        </div>
+      </section>
+
+      {/* 7. CTA */}
       <section className="relative py-32 bg-brand-text text-white overflow-hidden">
         <div className="absolute inset-0 opacity-10 pointer-events-none">
           {/* Subtle background texture */}

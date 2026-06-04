@@ -4,6 +4,7 @@ import "./globals.css";
 import { CartProvider } from "@/context/CartContext";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
+import GlobalBanner from "@/components/layout/GlobalBanner";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 const playfair = Playfair_Display({ subsets: ["latin"], variable: "--font-serif" });
@@ -64,6 +65,9 @@ export default function RootLayout({
     <html lang="en" className={`${inter.variable} ${playfair.variable}`} data-scroll-behavior="smooth">
       <body className="font-sans text-brand-text bg-brand-bg antialiased selection:bg-brand-primary selection:text-white">
         <CartProvider>
+          {/* Global Announcement Banner placed at the very top */}
+          <GlobalBanner />
+          
           <Navbar />
           {children}
           <Footer />
