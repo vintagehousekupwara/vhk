@@ -5,9 +5,7 @@ import { CartProvider } from "@/context/CartContext";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import GlobalBanner from "@/components/layout/GlobalBanner";
-
-// PERFORMANCE FIX: Native Next.js Third-Party loading for Google Tag Manager
-import { GoogleTagManager } from '@next/third-parties/google';
+import Script from "next/script";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 const playfair = Playfair_Display({ subsets: ["latin"], variable: "--font-serif" });
@@ -68,16 +66,26 @@ export default function RootLayout({
     <html lang="en" className={`${inter.variable} ${playfair.variable}`} data-scroll-behavior="smooth">
       <body className="font-sans text-brand-text bg-brand-bg antialiased selection:bg-brand-primary selection:text-white">
         <CartProvider>
-          {/* Global Announcement Banner placed at the very top */}
           <GlobalBanner />
-          
           <Navbar />
           {children}
           <Footer />
         </CartProvider>
+        
+        {/* TBT FIX: GA4 is now strictly lazy-loaded. It will NOT block the main thread. */}
+        <Script 
+          src="https://www.googletagmanager.com/gtag/js?id=G-PLX6SWNTHX" 
+          strategy="lazyOnload" 
+        />
+        <Script id="google-analytics" strategy="lazyOnload">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', 'G-PLX6SWNTHX', { page_path: window.location.pathname });
+          `}
+        </Script>
       </body>
-      {/* TBT FIX: Offloads Google Tag Manager from the main thread */}
-      <GoogleTagManager gtmId="G-PLX6SWNTHX" />
     </html>
   );
 }

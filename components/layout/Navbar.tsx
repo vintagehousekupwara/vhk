@@ -7,11 +7,10 @@ import Image from "next/image";
 import { Menu, X, User, ShoppingBag, Minus, Plus, Trash2 } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useCart } from "@/context/CartContext";
-import { getAuth, onAuthStateChanged } from "firebase/auth";
-import { app } from "@/lib/firebase";
 import { Playfair_Display } from "next/font/google";
 
-// Luxury font for the navigation items
+// Removed static firebase imports to prevent bundle bloat
+
 const playfair = Playfair_Display({ 
   subsets: ["latin"], 
   weight: ["400", "500", "600", "700"],
@@ -39,31 +38,42 @@ export default function Navbar() {
 
   const [userName, setUserName] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
-  
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
-    const auth = getAuth(app);
-    const unsub = onAuthStateChanged(auth, (user) => {
-      if (user && user.email) {
-        if (ADMIN_EMAILS.includes(user.email.toLowerCase())) {
-          setIsAdmin(true);
-          setUserName("Admin");
-        } else {
-          setIsAdmin(false);
-          const firstName = user.displayName ? user.displayName.split(" ")[0] : "Guest";
-          setUserName(firstName);
-        }
-      } else {
-        setUserName(null);
-        setIsAdmin(false);
+    
+    // TBT FIX: Dynamically import Firebase Auth 2.5 seconds after page load.
+    // This entirely removes Firebase from the initial render block!
+    const timer = setTimeout(async () => {
+      try {
+        const { getAuth, onAuthStateChanged } = await import("firebase/auth");
+        const { app } = await import("@/lib/firebase");
+        
+        const auth = getAuth(app);
+        onAuthStateChanged(auth, (user) => {
+          if (user && user.email) {
+            if (ADMIN_EMAILS.includes(user.email.toLowerCase())) {
+              setIsAdmin(true);
+              setUserName("Admin");
+            } else {
+              setIsAdmin(false);
+              const firstName = user.displayName ? user.displayName.split(" ")[0] : "Guest";
+              setUserName(firstName);
+            }
+          } else {
+            setUserName(null);
+            setIsAdmin(false);
+          }
+        });
+      } catch (error) {
+        console.error("Firebase auth lazy load error", error);
       }
-    });
-    return () => unsub();
+    }, 2500);
+
+    return () => clearTimeout(timer);
   }, []);
 
-  // Detect Scroll
   useMotionValueEvent(scrollY, "change", (latest) => {
     setIsScrolled(latest > 50);
   });
@@ -79,14 +89,11 @@ export default function Navbar() {
 
   const isActive = (path: string) => pathname === path;
 
-  // Hide Navbar completely on Admin Routes
   if (pathname.startsWith("/admin")) return null;
 
   return (
     <>
       <nav
-        // OPTIMIZATION: Swapped motion.nav for standard nav for the root element, 
-        // using pure CSS transitions for buttery smooth, hardware-accelerated scrolling.
         className={`fixed z-50 transition-all duration-300 ease-out left-1/2 -translate-x-1/2 w-[92%] sm:w-[95%] max-w-7xl rounded-2xl md:rounded-full ${
           isScrolled || mobileMenuOpen
             ? "top-4 bg-white/60 backdrop-blur-md border border-white/60 shadow-[0_8px_20px_rgba(209,242,172,0.2)] py-2" 
@@ -159,7 +166,6 @@ export default function Navbar() {
               )}
             </button>
 
-            {/* Mobile Menu Toggle Button */}
             <button 
               className={`md:hidden relative z-[60] p-1.5 shrink-0 rounded-full transition-colors ${mobileMenuOpen ? "bg-white/60 text-brand-text" : "bg-white/40 text-brand-text hover:bg-[#d1f2ac]/50"}`} 
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)} 
@@ -170,11 +176,9 @@ export default function Navbar() {
           </div>
         </div>
 
-        {/* MOBILE MENU EXPANDED (Highly Optimized) */}
         <AnimatePresence>
           {mobileMenuOpen && (
             <>
-              {/* Overlay: Removed expensive blur, using simple opacity for max performance */}
               <motion.div 
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}
                 onClick={() => setMobileMenuOpen(false)} 
@@ -185,7 +189,6 @@ export default function Navbar() {
                 initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }} transition={{ type: "spring", damping: 25, stiffness: 250 }}
                 className="fixed top-0 right-0 h-screen w-[75%] sm:w-[50%] bg-[#FDFCF8] shadow-[-10px_0_40px_rgba(0,0,0,0.1)] border-l border-[#d1f2ac]/30 z-[55] overflow-hidden flex flex-col pt-32 px-8 -top-10"
               >
-                {/* OPTIMIZATION: Zero-cost CSS radial gradients instead of heavy DOM animations */}
                 <div className="absolute inset-0 z-0 pointer-events-none opacity-40 bg-[radial-gradient(circle_at_100%_0%,_#d1f2ac_0%,_transparent_60%),radial-gradient(circle_at_0%_100%,_#d1f2ac_0%,_transparent_60%)]"></div>
 
                 <div className="relative z-10 flex flex-col space-y-8 mt-10">
@@ -225,11 +228,10 @@ export default function Navbar() {
         </AnimatePresence>
       </nav>
 
-      {/* Slide-out Cart Sidebar (Highly Optimized) */}
+      {/* Slide-out Cart Sidebar */}
       <AnimatePresence>
         {isCartOpen && (
           <>
-            {/* Overlay: Removed expensive blur */}
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} onClick={() => setIsCartOpen(false)} className="fixed inset-0 bg-black/40 z-[90]" />
             
             <motion.div initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }} transition={{ type: "spring", damping: 25, stiffness: 250 }} className="fixed top-0 right-0 h-full w-full max-w-md bg-[#FDFCF8] shadow-2xl z-[100] flex flex-col border-l border-[#d1f2ac]/50">
