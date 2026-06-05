@@ -6,6 +6,9 @@ import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import GlobalBanner from "@/components/layout/GlobalBanner";
 
+// PERFORMANCE FIX: Native Next.js Third-Party loading for Google Tag Manager
+import { GoogleTagManager } from '@next/third-parties/google';
+
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 const playfair = Playfair_Display({ subsets: ["latin"], variable: "--font-serif" });
 
@@ -73,6 +76,8 @@ export default function RootLayout({
           <Footer />
         </CartProvider>
       </body>
+      {/* TBT FIX: Offloads Google Tag Manager from the main thread */}
+      <GoogleTagManager gtmId="G-PLX6SWNTHX" />
     </html>
   );
 }

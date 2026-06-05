@@ -26,7 +26,8 @@ export default function Footer() {
   if (pathname.startsWith("/admin")) return null;
 
   return (
-    <footer className="w-full relative z-20 mt-20 border-t border-gray-200">
+    // CLS FIX: Added min-h-[600px] md:min-h-[500px] to prevent layout shifts during hydration
+    <footer className="w-full relative z-20 mt-20 border-t border-gray-200 min-h-[600px] md:min-h-[500px]">
       
       {/* 
         LIGHT SECTION 
@@ -48,6 +49,7 @@ export default function Footer() {
                   sizes="(max-width: 768px) 200px, 280px"
                   // scale-[1.15] expands it past invisible transparent edges, origin sets the zoom anchor
                   className="object-contain scale-[1.15] md:origin-left origin-center"
+                  loading="lazy"
                 />
               </Link>
               <p className="text-[#DE9C3A] tracking-widest uppercase text-xs font-bold mt-2">

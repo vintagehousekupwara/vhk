@@ -1,7 +1,11 @@
-import HomeClient from "@/components/Home/HomeClient";
-import FrontendPopup from "@/components/Home/FrontendPopup";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import dynamic from "next/dynamic";
+
+// PERFORMANCE FIX: Dynamically import heavy client components to split the JS payload.
+// next/dynamic automatically handles the code-splitting in Server Components.
+const HomeClient = dynamic(() => import("@/components/Home/HomeClient"));
+const FrontendPopup = dynamic(() => import("@/components/Home/FrontendPopup"));
 
 // Cache this page for 30 days (Admin panel will break this cache instantly when updated)
 export const revalidate = 2592000;

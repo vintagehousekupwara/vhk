@@ -176,13 +176,15 @@ export default function HomeClient({ rooms, dishes }: { rooms: any[], dishes: an
           transition={{ duration: 1.2, delay: 0.4, ease: "easeOut" }}
           className="relative z-10 w-full lg:w-[50%] h-[400px] md:h-[500px] lg:h-[700px] rounded-t-full rounded-b-xl overflow-hidden border-8 border-white shadow-floating"
         >
+          {/* LCP OPTIMIZATION: Priority true, Quality reduced to 75 */}
           <Image 
             src={homeData?.heroImage || "https://images.unsplash.com/photo-1618221118493-9cfa1a1c00da?q=80&w=1200&auto=format&fit=crop"} 
             alt="Elegant Luxury Room" 
             fill
             sizes="(max-width: 1024px) 100vw, 50vw"
             className="object-cover"
-            priority
+            priority={true}
+            quality={75}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
           <div className="absolute bottom-10 left-1/2 -translate-x-1/2 text-center w-full">
@@ -251,11 +253,13 @@ export default function HomeClient({ rooms, dishes }: { rooms: any[], dishes: an
               className="group relative bg-brand-bg border border-brand-secondary flex flex-col hover:shadow-floating transition-all duration-500 rounded-xl overflow-hidden"
             >
               <div className="relative w-full h-[300px] md:h-[450px] overflow-hidden">
+                {/* OPTIMIZATION: Quality 60 */}
                 <Image 
                   src={homeData?.kingSizeImage || "https://images.unsplash.com/photo-1590490360182-c33d57733427?q=80&w=1200&auto=format&fit=crop"} 
                   alt="King Size Room"
                   fill sizes="(max-width: 768px) 100vw, 50vw"
                   className="object-cover transition-transform duration-700 group-hover:scale-105"
+                  quality={60}
                 />
                 <div className="absolute top-6 left-6 bg-brand-text text-white px-5 py-2 font-serif font-bold text-sm tracking-widest uppercase z-10 shadow-sm">Premium</div>
                 <div className="absolute top-6 right-6 bg-white/90 backdrop-blur text-brand-text px-4 py-2 font-bold text-sm z-10 rounded shadow-sm">
@@ -290,11 +294,13 @@ export default function HomeClient({ rooms, dishes }: { rooms: any[], dishes: an
               className="group relative bg-brand-bg border border-brand-secondary flex flex-col hover:shadow-floating transition-all duration-500 rounded-xl overflow-hidden"
             >
               <div className="relative w-full h-[300px] md:h-[450px] overflow-hidden">
+                {/* OPTIMIZATION: Quality 60 */}
                 <Image 
                   src={homeData?.doubleBedImage || "https://res.cloudinary.com/dfdnjuhpw/image/upload/q_auto/f_auto/v1780488159/db_fvbirv.jpg"} 
                   alt="Double Bed Room"
                   fill sizes="(max-width: 768px) 100vw, 50vw"
                   className="object-cover transition-transform duration-700 group-hover:scale-105"
+                  quality={60}
                 />
                 <div className="absolute top-6 left-6 bg-brand-text text-white px-5 py-2 font-serif font-bold text-sm tracking-widest uppercase z-10 shadow-sm">Classic</div>
                 <div className="absolute top-6 right-6 bg-white/90 backdrop-blur text-brand-text px-4 py-2 font-bold text-sm z-10 rounded shadow-sm">
@@ -361,7 +367,7 @@ export default function HomeClient({ rooms, dishes }: { rooms: any[], dishes: an
         </div>
       </section>
 
-      {/* 4. DYNAMIC EXPLORE KASHMIR SECTION (Updated with mixed outline) */}
+      {/* 4. DYNAMIC EXPLORE KASHMIR SECTION */}
       <section className="w-full bg-white py-16 md:py-24 px-4 md:px-6 lg:px-24 border-t border-brand-secondary/50">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 md:mb-16 gap-6">
@@ -383,15 +389,17 @@ export default function HomeClient({ rooms, dishes }: { rooms: any[], dishes: an
                 whileInView={{ opacity: 1, y: 0 }} 
                 viewport={{ once: true }} 
                 transition={{ delay: index * 0.15, duration: 0.6 }} 
-                // Mixed gradient padding to create the #c4f092 and #A65520 (chocolate) border
                 className="group relative rounded-xl p-[2px] bg-gradient-to-br from-[#c4f092] to-[#A65520] shadow-sm hover:shadow-floating transition-all duration-500"
               >
                 <div className="relative w-full h-[350px] md:h-[500px] lg:h-[600px] rounded-[10px] overflow-hidden">
+                  {/* OPTIMIZATION: Quality 60 and Lazy load */}
                   <Image 
                     src={place.img || "https://res.cloudinary.com/dfdnjuhpw/image/upload/q_auto/f_auto/v1780495146/kkk_zynfng.jpg"} 
                     alt={place.name || "Kashmir Destination"} 
                     fill sizes="(max-width: 1024px) 100vw, 50vw" 
                     className="object-cover transition-transform duration-[1.5s] ease-out group-hover:scale-110" 
+                    quality={60}
+                    loading="lazy"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-brand-text/90 via-brand-text/10 to-transparent opacity-80 group-hover:opacity-100 transition-opacity duration-500" />
                   <div className="absolute bottom-8 left-8 right-8 md:bottom-12 md:left-12">
@@ -440,7 +448,8 @@ export default function HomeClient({ rooms, dishes }: { rooms: any[], dishes: an
                   <div key={dish.id} className="group relative bg-white rounded-t-[40px] md:rounded-t-[80px] rounded-b-xl p-3 md:p-5 pt-12 md:pt-20 shadow-sm hover:shadow-floating transition-shadow duration-300 border border-brand-secondary flex flex-col items-center text-center mt-6 md:mt-10">
                     <div className="absolute -top-8 md:-top-12 left-1/2 -translate-x-1/2 w-20 h-20 md:w-32 md:h-32 rounded-full z-10">
                       <div className="w-full h-full relative group-hover:-translate-y-1 transition-transform duration-300">
-                        <Image src={dish.image} alt={dish.name} fill sizes="(max-width: 768px) 80px, 128px" className="object-cover drop-shadow-xl rounded-full" />
+                        {/* OPTIMIZATION: Quality 50, Lazy load since it's an icon */}
+                        <Image src={dish.image} alt={dish.name} fill sizes="(max-width: 768px) 80px, 128px" className="object-cover drop-shadow-xl rounded-full" quality={50} loading="lazy" />
                       </div>
                     </div>
                     <span className="text-brand-primary text-[9px] md:text-[10px] uppercase tracking-widest font-bold mb-1 block">{dish.category}</span>
@@ -482,7 +491,7 @@ export default function HomeClient({ rooms, dishes }: { rooms: any[], dishes: an
         </div>
       </section>
       
-      {/* 6. GOOGLE REVIEWS & TESTIMONIALS (Updated with premium thin border transition) */}
+      {/* 6. GOOGLE REVIEWS & TESTIMONIALS */}
       <section className="w-full bg-white py-16 md:py-24 px-4 md:px-6 lg:px-24 border-t border-brand-secondary/50">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col items-center text-center mb-12 md:mb-16">
@@ -514,7 +523,6 @@ export default function HomeClient({ rooms, dishes }: { rooms: any[], dishes: an
                 whileInView={{ opacity: 1, y: 0 }} 
                 viewport={{ once: true }} 
                 transition={{ duration: 0.5, delay: index * 0.15 }} 
-                // Subtle 1px solid border transitioning from #c4f092 to chocolate on hover
                 className="bg-brand-bg/50 border border-[#c4f092] hover:border-[#A65520] p-8 rounded-2xl flex flex-col relative overflow-hidden group hover:shadow-[0_8px_30px_rgba(196,240,146,0.3)] hover:bg-white transition-all duration-500"
               >
                 <Quote className="absolute top-6 right-6 w-12 h-12 text-brand-secondary/40 group-hover:text-[#c4f092]/50 transition-colors" />
@@ -522,7 +530,8 @@ export default function HomeClient({ rooms, dishes }: { rooms: any[], dishes: an
                 <p className="text-brand-muted text-sm md:text-base italic leading-relaxed mb-8 flex-grow">"{testimonial.quote}"</p>
                 <div className="flex items-center gap-4 mt-auto pt-6 border-t border-brand-secondary/50">
                   <div className="relative w-12 h-12 rounded-full overflow-hidden border-2 border-white shadow-sm shrink-0">
-                    <Image src={testimonial.image || "https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png"} alt={testimonial.name} fill unoptimized className="object-cover" />
+                    {/* OPTIMIZATION: Quality 50, Lazy load */}
+                    <Image src={testimonial.image || "https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png"} alt={testimonial.name} fill unoptimized className="object-cover" quality={50} loading="lazy" />
                   </div>
                   <div>
                     <h5 className="font-bold text-brand-text text-sm md:text-base">{testimonial.name}</h5>
