@@ -14,6 +14,22 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/context/CartContext";
 
+// Import Next.js optimized Google Fonts
+import { Grand_Hotel, Playfair_Display } from "next/font/google";
+
+const grandHotel = Grand_Hotel({ 
+  weight: "400", 
+  subsets: ["latin"],
+  display: "swap",
+});
+
+const playfair = Playfair_Display({ 
+  subsets: ["latin"], 
+  weight: ["600", "700", "800"], 
+  style: ["normal", "italic"],
+  display: "swap",
+});
+
 const formatYYYYMMDD = (date: Date) => {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -142,7 +158,7 @@ export default function HomeClient({ rooms, dishes }: { rooms: any[], dishes: an
           <Loader2 className="w-12 h-12 animate-spin text-brand-primary" />
           <div className="absolute inset-0 w-12 h-12 border-4 border-brand-primary/20 rounded-full"></div>
         </div>
-        <p className="mt-4 font-serif text-brand-text tracking-widest uppercase text-xs animate-pulse">
+        <p className={`mt-4 text-brand-text text-xl ${grandHotel.className}`}>
           Loading Experience...
         </p>
       </div>
@@ -153,45 +169,13 @@ export default function HomeClient({ rooms, dishes }: { rooms: any[], dishes: an
     <main className="w-full overflow-hidden">
       
       {/* 1. HERO SECTION */}
-      <section className="relative w-full lg:min-h-[calc(100vh-6rem)] flex flex-col lg:flex-row items-center justify-center lg:justify-between px-6 lg:px-24 py-8 lg:py-0 overflow-hidden bg-brand-bg gap-12 lg:gap-8 pt-24 lg:pt-0">
-        <motion.div 
-          initial={{ opacity: 0, x: -50 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.8, delay: 0.2 }}
-          className="z-20 w-full lg:w-[45%] text-center lg:text-left flex flex-col items-center lg:items-start"
-        >
-          <div className="flex items-center justify-center lg:justify-start gap-4 mb-4 lg:mb-6">
-            <span className="w-8 md:w-12 h-[1px] bg-brand-primary"></span>
-            <span className="text-brand-primary tracking-widest uppercase text-[10px] md:text-sm font-medium">Your Sanctuary Awaits</span>
-          </div>
-
-          <h2 className="font-serif text-4xl sm:text-5xl md:text-6xl xl:text-7xl leading-[1.1] mb-4 lg:mb-6 text-brand-text">
-            Experience <br className="hidden lg:block"/>
-            <span className="italic text-brand-primary font-normal">Unrivaled</span> <br />
-            Comfort.
-          </h2>
-          
-          <p className="text-brand-muted text-sm md:text-lg xl:text-xl mb-8 max-w-lg leading-relaxed font-light hidden sm:block">
-            Immerse yourself in world-class hospitality at The Vintage House Kupwara. Discover our exclusive collection of premium luxury suites, designed for those who appreciate the finer things in North Kashmir.
-          </p>
-          
-          <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-3 w-full sm:w-auto">
-            <Link href="#accommodations" className="w-full sm:w-auto">
-              <button className="w-full flex items-center justify-center gap-2 bg-brand-primary text-white px-8 py-4 rounded-none text-xs md:text-sm tracking-widest uppercase hover:bg-[#A65520] transition-colors shadow-luxury">
-                <CalendarDays size={16} />
-                Reserve Your Stay
-              </button>
-            </Link>
-          </div>
-        </motion.div>
-
+      <section className="relative w-full lg:min-h-[calc(100vh-6rem)] flex flex-col lg:flex-row-reverse items-center justify-center lg:justify-between px-6 lg:px-24 py-8 lg:py-0 overflow-hidden bg-brand-bg gap-12 lg:gap-8 pt-24 lg:pt-0">
         <motion.div 
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 1.2, delay: 0.4, ease: "easeOut" }}
           className="relative z-10 w-full lg:w-[50%] h-[400px] md:h-[500px] lg:h-[700px] rounded-t-full rounded-b-xl overflow-hidden border-8 border-white shadow-floating"
         >
-          {/* SAFE FALLBACK ADDED HERE */}
           <Image 
             src={homeData?.heroImage || "https://images.unsplash.com/photo-1618221118493-9cfa1a1c00da?q=80&w=1200&auto=format&fit=crop"} 
             alt="Elegant Luxury Room" 
@@ -200,9 +184,43 @@ export default function HomeClient({ rooms, dishes }: { rooms: any[], dishes: an
             className="object-cover"
             priority
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
           <div className="absolute bottom-10 left-1/2 -translate-x-1/2 text-center w-full">
-            <p className="text-white font-serif text-2xl italic">The Vintage House Kupwara</p>
+            <p className={`text-white text-3xl md:text-4xl ${grandHotel.className}`}>
+              The Vintage House Kupwara
+            </p>
+          </div>
+        </motion.div>
+
+        <motion.div 
+          initial={{ opacity: 0, x: -50 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.8, delay: 0.2 }}
+          className="z-20 w-full lg:w-[45%] text-center lg:text-left flex flex-col items-center lg:items-start"
+        >
+          <div className="flex items-center justify-center lg:justify-start gap-4 mb-4 lg:mb-6">
+            <span className={`text-brand-primary text-2xl md:text-3xl ${grandHotel.className}`}>
+              Your Sanctuary Awaits
+            </span>
+          </div>
+
+          <h2 className={`text-4xl sm:text-5xl md:text-6xl xl:text-7xl leading-[1.1] mb-4 lg:mb-6 text-brand-text font-bold ${playfair.className}`}>
+            Experience <br className="hidden lg:block"/>
+            <span className="italic text-brand-primary font-normal">Unrivaled</span> <br />
+            Comfort.
+          </h2>
+          
+          <p className="text-brand-muted text-sm md:text-lg xl:text-xl mb-8 max-w-lg leading-relaxed font-light px-2 lg:px-0">
+            Immerse yourself in world-class hospitality at The Vintage House Kupwara. Discover our exclusive collection of premium luxury suites, designed for those who appreciate the finer things in North Kashmir.
+          </p>
+          
+          <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-3 w-full sm:w-auto mt-4">
+            <Link href="#accommodations" className="w-full sm:w-auto">
+              <button className="w-full flex items-center justify-center gap-2 bg-brand-primary text-white px-8 py-4 rounded-none text-xs md:text-sm tracking-widest uppercase hover:bg-[#A65520] transition-colors shadow-luxury">
+                <CalendarDays size={16} />
+                Reserve Your Stay
+              </button>
+            </Link>
           </div>
         </motion.div>
       </section>
@@ -213,13 +231,13 @@ export default function HomeClient({ rooms, dishes }: { rooms: any[], dishes: an
           <div className="text-center mb-16 md:mb-24 flex flex-col items-center">
             <motion.span 
               initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
-              className="text-brand-primary tracking-widest uppercase text-xs md:text-sm font-medium mb-2 md:mb-4 block"
+              className={`text-brand-primary text-3xl md:text-4xl mb-2 md:mb-4 block ${grandHotel.className}`}
             >
               Exclusive Accommodations
             </motion.span>
             <motion.h3 
               initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.1 }}
-              className="font-serif text-4xl md:text-5xl text-brand-text max-w-2xl"
+              className={`text-4xl md:text-5xl text-brand-text max-w-2xl font-bold ${playfair.className}`}
             >
               Choose Your Sanctuary
             </motion.h3>
@@ -233,7 +251,6 @@ export default function HomeClient({ rooms, dishes }: { rooms: any[], dishes: an
               className="group relative bg-brand-bg border border-brand-secondary flex flex-col hover:shadow-floating transition-all duration-500 rounded-xl overflow-hidden"
             >
               <div className="relative w-full h-[300px] md:h-[450px] overflow-hidden">
-                {/* SAFE FALLBACK ADDED HERE */}
                 <Image 
                   src={homeData?.kingSizeImage || "https://images.unsplash.com/photo-1590490360182-c33d57733427?q=80&w=1200&auto=format&fit=crop"} 
                   alt="King Size Room"
@@ -273,7 +290,6 @@ export default function HomeClient({ rooms, dishes }: { rooms: any[], dishes: an
               className="group relative bg-brand-bg border border-brand-secondary flex flex-col hover:shadow-floating transition-all duration-500 rounded-xl overflow-hidden"
             >
               <div className="relative w-full h-[300px] md:h-[450px] overflow-hidden">
-                {/* SAFE FALLBACK ADDED HERE */}
                 <Image 
                   src={homeData?.doubleBedImage || "https://res.cloudinary.com/dfdnjuhpw/image/upload/q_auto/f_auto/v1780488159/db_fvbirv.jpg"} 
                   alt="Double Bed Room"
@@ -315,8 +331,12 @@ export default function HomeClient({ rooms, dishes }: { rooms: any[], dishes: an
       <section className="w-full bg-brand-bg py-16 md:py-24 px-6 lg:px-24 border-t border-brand-secondary/30">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16 flex flex-col items-center">
-            <motion.span initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="text-brand-primary tracking-widest uppercase text-xs md:text-sm font-medium mb-2 md:mb-4 block">Premium Facilities</motion.span>
-            <motion.h3 initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.1 }} className="font-serif text-4xl md:text-5xl text-brand-text max-w-3xl">Event & Dining Spaces</motion.h3>
+            <motion.span initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className={`text-brand-primary text-3xl md:text-4xl mb-2 md:mb-4 block ${grandHotel.className}`}>
+              Premium Facilities
+            </motion.span>
+            <motion.h3 initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.1 }} className={`text-4xl md:text-5xl text-brand-text max-w-3xl font-bold ${playfair.className}`}>
+              Event & Dining Spaces
+            </motion.h3>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5 }} className="bg-white p-8 md:p-10 rounded-2xl border border-brand-secondary shadow-sm hover:shadow-floating transition-all group flex flex-col">
@@ -341,13 +361,17 @@ export default function HomeClient({ rooms, dishes }: { rooms: any[], dishes: an
         </div>
       </section>
 
-      {/* 4. DYNAMIC EXPLORE KASHMIR SECTION */}
+      {/* 4. DYNAMIC EXPLORE KASHMIR SECTION (Updated with mixed outline) */}
       <section className="w-full bg-white py-16 md:py-24 px-4 md:px-6 lg:px-24 border-t border-brand-secondary/50">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 md:mb-16 gap-6">
             <div>
-              <motion.span initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="text-brand-primary tracking-widest uppercase text-xs md:text-sm font-medium mb-2 block">Explore Kupwara</motion.span>
-              <motion.h3 initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="font-serif text-4xl md:text-5xl text-brand-text max-w-2xl">Serene Destinations Nearby</motion.h3>
+              <motion.span initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className={`text-brand-primary text-3xl md:text-4xl mb-2 block ${grandHotel.className}`}>
+                Explore Kupwara
+              </motion.span>
+              <motion.h3 initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className={`text-4xl md:text-5xl text-brand-text max-w-2xl font-bold ${playfair.className}`}>
+                Serene Destinations Nearby
+              </motion.h3>
             </div>
           </div>
           
@@ -359,19 +383,23 @@ export default function HomeClient({ rooms, dishes }: { rooms: any[], dishes: an
                 whileInView={{ opacity: 1, y: 0 }} 
                 viewport={{ once: true }} 
                 transition={{ delay: index * 0.15, duration: 0.6 }} 
-                className="group relative h-[350px] md:h-[500px] lg:h-[600px] overflow-hidden border border-brand-secondary rounded-xl shadow-sm hover:shadow-floating transition-all duration-500"
+                // Mixed gradient padding to create the #c4f092 and #A65520 (chocolate) border
+                className="group relative rounded-xl p-[2px] bg-gradient-to-br from-[#c4f092] to-[#A65520] shadow-sm hover:shadow-floating transition-all duration-500"
               >
-                {/* SAFE FALLBACK ADDED HERE */}
-                <Image 
-                  src={place.img || "https://res.cloudinary.com/dfdnjuhpw/image/upload/q_auto/f_auto/v1780495146/kkk_zynfng.jpg"} 
-                  alt={place.name || "Kashmir Destination"} 
-                  fill sizes="(max-width: 1024px) 100vw, 50vw" 
-                  className="object-cover transition-transform duration-[1.5s] ease-out group-hover:scale-110" 
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-brand-text/90 via-brand-text/10 to-transparent opacity-80 group-hover:opacity-100 transition-opacity duration-500" />
-                <div className="absolute bottom-8 left-8 right-8 md:bottom-12 md:left-12">
-                  <h4 className="font-serif text-3xl md:text-4xl text-white tracking-wide group-hover:text-brand-primary transition-colors duration-300 drop-shadow-md">{place.name || "Destination"}</h4>
-                  <div className="h-[2px] w-12 bg-brand-primary mt-4 group-hover:w-1/3 transition-all duration-700 ease-out" />
+                <div className="relative w-full h-[350px] md:h-[500px] lg:h-[600px] rounded-[10px] overflow-hidden">
+                  <Image 
+                    src={place.img || "https://res.cloudinary.com/dfdnjuhpw/image/upload/q_auto/f_auto/v1780495146/kkk_zynfng.jpg"} 
+                    alt={place.name || "Kashmir Destination"} 
+                    fill sizes="(max-width: 1024px) 100vw, 50vw" 
+                    className="object-cover transition-transform duration-[1.5s] ease-out group-hover:scale-110" 
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-brand-text/90 via-brand-text/10 to-transparent opacity-80 group-hover:opacity-100 transition-opacity duration-500" />
+                  <div className="absolute bottom-8 left-8 right-8 md:bottom-12 md:left-12">
+                    <h4 className={`text-3xl md:text-4xl text-white tracking-wide group-hover:text-[#c4f092] transition-colors duration-300 drop-shadow-md ${playfair.className}`}>
+                      {place.name || "Destination"}
+                    </h4>
+                    <div className="h-[2px] w-12 bg-[#c4f092] mt-4 group-hover:w-1/3 transition-all duration-700 ease-out" />
+                  </div>
                 </div>
               </motion.div>
             ))}
@@ -384,8 +412,12 @@ export default function HomeClient({ rooms, dishes }: { rooms: any[], dishes: an
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-6">
             <div>
-              <motion.span initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="text-brand-primary tracking-widest uppercase text-xs md:text-sm font-medium mb-2 block">Dining & Room Service</motion.span>
-              <motion.h3 initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="font-serif text-3xl md:text-4xl text-brand-text">In-House Restaurant</motion.h3>
+              <motion.span initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className={`text-brand-primary text-3xl md:text-4xl mb-2 block ${grandHotel.className}`}>
+                Dining & Room Service
+              </motion.span>
+              <motion.h3 initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className={`text-3xl md:text-4xl text-brand-text font-bold ${playfair.className}`}>
+                In-House Restaurant
+              </motion.h3>
             </div>
             <div className="relative w-full md:w-72">
               <Search size={18} className="absolute left-4 top-3.5 text-brand-accent" />
@@ -440,7 +472,9 @@ export default function HomeClient({ rooms, dishes }: { rooms: any[], dishes: an
               </>
             ) : (
               <div className="col-span-2 md:col-span-4 text-center py-12 bg-white rounded-xl border border-brand-secondary">
-                <p className="text-brand-muted font-serif text-xl italic mb-4">No dishes found in this category or matching &quot;{searchQuery}&quot;</p>
+                <p className={`text-brand-muted text-3xl mb-4 ${grandHotel.className}`}>
+                  No dishes found in this category or matching "{searchQuery}"
+                </p>
                 <button onClick={() => { setSearchQuery(""); setSelectedCategory("All"); }} className="text-brand-primary text-sm font-bold uppercase tracking-widest hover:underline">Clear Filters</button>
               </div>
             )}
@@ -448,12 +482,16 @@ export default function HomeClient({ rooms, dishes }: { rooms: any[], dishes: an
         </div>
       </section>
       
-      {/* 6. GOOGLE REVIEWS & TESTIMONIALS */}
+      {/* 6. GOOGLE REVIEWS & TESTIMONIALS (Updated with premium thin border transition) */}
       <section className="w-full bg-white py-16 md:py-24 px-4 md:px-6 lg:px-24 border-t border-brand-secondary/50">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col items-center text-center mb-12 md:mb-16">
-            <motion.span initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="flex items-center gap-2 text-brand-primary tracking-widest uppercase text-xs md:text-sm font-medium mb-4">Guest Experiences</motion.span>
-            <motion.h3 initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.1 }} className="font-serif text-4xl md:text-5xl text-brand-text mb-6">What Our Guests Say</motion.h3>
+            <motion.span initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className={`text-brand-primary text-3xl md:text-4xl mb-4 ${grandHotel.className}`}>
+              Guest Experiences
+            </motion.span>
+            <motion.h3 initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.1 }} className={`text-4xl md:text-5xl text-brand-text mb-6 font-bold ${playfair.className}`}>
+              What Our Guests Say
+            </motion.h3>
             <motion.div initial={{ opacity: 0, scale: 0.95 }} whileInView={{ opacity: 1, scale: 1 }} viewport={{ once: true }} transition={{ delay: 0.2 }} className="flex items-center gap-3 bg-gray-50 border border-gray-200 px-5 py-2.5 rounded-full shadow-sm">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="20px" height="20px">
                 <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
@@ -470,9 +508,17 @@ export default function HomeClient({ rooms, dishes }: { rooms: any[], dishes: an
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
             {TESTIMONIALS.map((testimonial, index) => (
-              <motion.div key={testimonial.id} initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5, delay: index * 0.15 }} className="bg-brand-bg/50 border border-brand-secondary/50 p-8 rounded-2xl flex flex-col relative overflow-hidden group hover:shadow-floating hover:bg-white transition-all duration-300">
-                <Quote className="absolute top-6 right-6 w-12 h-12 text-brand-secondary/40 group-hover:text-brand-primary/10 transition-colors" />
-                <div className="flex gap-1 mb-6 text-brand-accent">{[...Array(Math.floor(testimonial.rating))].map((_, i) => <Star key={i} size={16} className="fill-current" />)}</div>
+              <motion.div 
+                key={testimonial.id} 
+                initial={{ opacity: 0, y: 30 }} 
+                whileInView={{ opacity: 1, y: 0 }} 
+                viewport={{ once: true }} 
+                transition={{ duration: 0.5, delay: index * 0.15 }} 
+                // Subtle 1px solid border transitioning from #c4f092 to chocolate on hover
+                className="bg-brand-bg/50 border border-[#c4f092] hover:border-[#A65520] p-8 rounded-2xl flex flex-col relative overflow-hidden group hover:shadow-[0_8px_30px_rgba(196,240,146,0.3)] hover:bg-white transition-all duration-500"
+              >
+                <Quote className="absolute top-6 right-6 w-12 h-12 text-brand-secondary/40 group-hover:text-[#c4f092]/50 transition-colors" />
+                <div className="flex gap-1 mb-6 text-[#A65520]">{[...Array(Math.floor(testimonial.rating))].map((_, i) => <Star key={i} size={16} className="fill-current" />)}</div>
                 <p className="text-brand-muted text-sm md:text-base italic leading-relaxed mb-8 flex-grow">"{testimonial.quote}"</p>
                 <div className="flex items-center gap-4 mt-auto pt-6 border-t border-brand-secondary/50">
                   <div className="relative w-12 h-12 rounded-full overflow-hidden border-2 border-white shadow-sm shrink-0">
