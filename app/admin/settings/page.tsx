@@ -10,7 +10,9 @@ import {
   MapPin, 
   UploadCloud, 
   Megaphone, 
-  BellRing 
+  BellRing,
+  Plus,
+  Trash2
 } from "lucide-react";
 import { purgeWebsiteCache } from "@/app/actions/cache";
 
@@ -65,7 +67,7 @@ const CloudinaryUpload = ({ currentImage, onUpload }: { currentImage: string, on
         <div className={`w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed rounded-lg transition-colors ${uploading ? 'bg-gray-50 border-gray-300 text-gray-400' : 'bg-brand-primary/5 border-brand-primary/30 text-brand-primary hover:bg-brand-primary/10 cursor-pointer'}`}>
           {uploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <UploadCloud className="w-5 h-5" />}
           <span className="font-bold text-sm tracking-wide uppercase">
-            {uploading ? "Uploading to Cloudinary..." : "Click or Tap to Upload Image"}
+            {uploading ? "Uploading..." : "Click or Tap to Upload Image"}
           </span>
         </div>
       </div>
@@ -82,18 +84,19 @@ const DEFAULT_HOME_DATA = {
     { name: "Keran Valley", img: "https://res.cloudinary.com/dfdnjuhpw/image/upload/q_auto/f_auto/v1780495146/kkk_zynfng.jpg" },
     { name: "Bungus Valley", img: "https://res.cloudinary.com/dfdnjuhpw/image/upload/q_auto/f_auto/v1780469195/bungus_valley_fsuopv.jpg" },
     { name: "Sharda Mandir", img: "https://res.cloudinary.com/dfdnjuhpw/image/upload/q_auto/f_auto/v1780495015/2024_7_largeimg_476843546_ubb7dv.jpg" },
-    { name: "Lolab Valley", img: "https://res.cloudinary.com/dfdnjuhpw/image/upload/q_auto/f_auto/v1780497987/0_lryde3.jpg" }
+    { name: "Lolab Valley", img: "https://res.cloudinary.com/dfdnjuhpw/image/upload/q_auto/f_auto/v1780497987/0_lryde3.jpg" },
+    { name: "Teetwal", img: "https://res.cloudinary.com/dfdnjuhpw/image/upload/q_auto/f_auto/v1780833879/teetwal-valley_kashmir_brown_chinar_kashmir_mzofsm.webp" },
+    { name: "Kalaroos Caves", img: "https://res.cloudinary.com/dfdnjuhpw/image/upload/q_auto/f_auto/v1780833878/kalaroos_caves_ftrcrp.jpg" },
+    { name: "Sadhna Top", img: "https://res.cloudinary.com/dfdnjuhpw/image/upload/q_auto/f_auto/v1780833878/sadhna_hi0jeh.jpg" },
   ],
-  // NEW: Banner Defaults
   announcementBanner: {
     enabled: false,
     text: "Restaurant is temporarily closed today for private event.",
-    bgColor: "#dc2626", // Red-600 default
+    bgColor: "#dc2626", 
     textColor: "#ffffff",
     linkText: "Read More",
     linkUrl: "/about"
   },
-  // NEW: Pop-up Defaults
   frontendPopup: {
     enabled: false,
     title: "Special Winter Offer!",
@@ -101,7 +104,7 @@ const DEFAULT_HOME_DATA = {
     image: "",
     buttonText: "Book Now",
     buttonUrl: "/book",
-    delay: 3 // Delay in seconds before it shows
+    delay: 3 
   }
 };
 
@@ -115,10 +118,10 @@ export default function AdminHomepageSettings() {
       const docSnap = await getDoc(doc(db, "settings", "homepage"));
       if (docSnap.exists()) {
         const data = docSnap.data();
-        // Deep merge to ensure nested objects like announcementBanner aren't overwritten if they don't exist in DB yet
         setHomeData({ 
           ...DEFAULT_HOME_DATA, 
           ...data,
+          destinations: data.destinations || DEFAULT_HOME_DATA.destinations, // Ensure destinations exist
           announcementBanner: { ...DEFAULT_HOME_DATA.announcementBanner, ...(data.announcementBanner || {}) },
           frontendPopup: { ...DEFAULT_HOME_DATA.frontendPopup, ...(data.frontendPopup || {}) }
         });
@@ -146,6 +149,20 @@ export default function AdminHomepageSettings() {
     const newDestinations = [...homeData.destinations];
     newDestinations[index][field] = value;
     setHomeData({ ...homeData, destinations: newDestinations });
+  };
+
+  const addDestination = () => {
+    setHomeData({
+      ...homeData,
+      destinations: [...homeData.destinations, { name: "New Destination", img: "" }]
+    });
+  };
+
+  const removeDestination = (indexToRemove: number) => {
+    if (confirm("Are you sure you want to remove this destination?")) {
+      const newDestinations = homeData.destinations.filter((_, index) => index !== indexToRemove);
+      setHomeData({ ...homeData, destinations: newDestinations });
+    }
   };
 
   const updateBanner = (field: string, value: string | boolean) => {
@@ -313,19 +330,37 @@ export default function AdminHomepageSettings() {
         </div>
       </div>
 
-      {/* 4. NEARBY DESTINATIONS SECTION */}
+      {/* 4. DYNAMIC NEARBY DESTINATIONS SECTION */}
       <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-        <div className="flex items-center gap-2 mb-6 border-b pb-2">
-          <MapPin className="text-brand-primary w-5 h-5" />
-          <h3 className="text-lg font-bold text-gray-800">Nearby Scenic Destinations</h3>
+        <div className="flex items-center justify-between mb-6 border-b pb-2">
+          <div className="flex items-center gap-2">
+            <MapPin className="text-brand-primary w-5 h-5" />
+            <h3 className="text-lg font-bold text-gray-800">Nearby Scenic Destinations</h3>
+          </div>
+          <span className="text-sm font-bold text-brand-primary bg-brand-primary/10 px-3 py-1 rounded-full">
+            {homeData.destinations.length} Active
+          </span>
         </div>
-        <p className="text-xs text-gray-400 uppercase tracking-widest font-bold mb-6">Edit the 4 featured locations on the homepage.</p>
+        <p className="text-xs text-gray-400 uppercase tracking-widest font-bold mb-6">
+          Add, edit, or remove nearby destinations shown in the scrolling marquee.
+        </p>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
           {homeData.destinations.map((dest, index) => (
-            <div key={index} className="bg-gray-50 p-5 border border-gray-200 rounded-xl space-y-4">
+            <div key={index} className="bg-gray-50 p-5 border border-gray-200 rounded-xl space-y-4 relative group hover:border-brand-primary/50 transition-colors">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-bold text-gray-400 uppercase tracking-widest">Location {index + 1}</span>
+                <button 
+                  onClick={() => removeDestination(index)}
+                  className="text-red-400 hover:text-red-600 p-1.5 rounded-md hover:bg-red-50 transition-colors"
+                  title="Remove Destination"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+              
               <div>
-                <label className="text-xs font-bold text-gray-500 uppercase">Location {index + 1} Name</label>
+                <label className="text-xs font-bold text-gray-500 uppercase">Destination Name</label>
                 <input 
                   type="text" 
                   value={dest.name} 
@@ -334,7 +369,7 @@ export default function AdminHomepageSettings() {
                 />
               </div>
               <div>
-                <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Upload New Image</label>
+                <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Upload Location Image</label>
                 <CloudinaryUpload 
                   currentImage={dest.img} 
                   onUpload={(url) => updateDestination(index, "img", url)} 
@@ -343,6 +378,15 @@ export default function AdminHomepageSettings() {
             </div>
           ))}
         </div>
+
+        {/* ADD NEW DESTINATION BUTTON */}
+        <button 
+          onClick={addDestination}
+          className="w-full border-2 border-dashed border-gray-300 rounded-xl p-4 flex items-center justify-center gap-2 text-gray-500 hover:text-brand-primary hover:border-brand-primary hover:bg-brand-primary/5 transition-all"
+        >
+          <Plus className="w-5 h-5" />
+          <span className="font-bold text-sm uppercase tracking-widest">Add New Destination</span>
+        </button>
       </div>
 
     </div>

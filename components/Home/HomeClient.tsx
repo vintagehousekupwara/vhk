@@ -367,10 +367,26 @@ export default function HomeClient({ rooms, dishes }: { rooms: any[], dishes: an
         </div>
       </section>
 
-      {/* 4. DYNAMIC EXPLORE KASHMIR SECTION */}
-      <section className="w-full bg-white py-16 md:py-24 px-4 md:px-6 lg:px-24 border-t border-brand-secondary/50">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 md:mb-16 gap-6">
+     {/* 4. DYNAMIC EXPLORE KASHMIR SECTION */}
+      <section className="w-full bg-white py-16 md:py-24 px-0 border-t border-brand-secondary/50 overflow-hidden">
+        {/* Pure CSS injected here guarantees 0 JS execution lag and smooth GPU acceleration */}
+        <style>{`
+          @keyframes nearby-infinite-scroll {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
+          }
+          .nearby-animate-infinite-scroll {
+            animation: nearby-infinite-scroll 40s linear infinite;
+            width: max-content;
+          }
+          .nearby-animate-infinite-scroll:hover {
+            animation-play-state: paused;
+          }
+        `}</style>
+
+        {/* Header container kept constrained for alignment */}
+        <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-24 mb-10 md:mb-12">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
             <div>
               <motion.span initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className={`text-brand-primary text-3xl md:text-4xl mb-2 block ${grandHotel.className}`}>
                 Explore Kupwara
@@ -380,36 +396,46 @@ export default function HomeClient({ rooms, dishes }: { rooms: any[], dishes: an
               </motion.h3>
             </div>
           </div>
-          
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-10">
-            {homeData.destinations?.map((place: any, index: number) => (
-              <motion.div 
+        </div>
+        
+        {/* Infinite Scrolling Row Container */}
+        <div className="relative w-full overflow-hidden">
+          <div className="flex nearby-animate-infinite-scroll">
+            {/* Duplicating the destinations array creates a seamless infinite looping illusion */}
+            {[
+              ...(homeData.destinations || []), 
+              ...(homeData.destinations || []), 
+              ...(homeData.destinations || []), 
+              ...(homeData.destinations || []),
+              ...(homeData.destinations || []),
+              ...(homeData.destinations || [])
+            ].map((place: any, index: number) => (
+              <div 
                 key={index} 
-                initial={{ opacity: 0, y: 30 }} 
-                whileInView={{ opacity: 1, y: 0 }} 
-                viewport={{ once: true }} 
-                transition={{ delay: index * 0.15, duration: 0.6 }} 
-                className="group relative rounded-xl p-[2px] bg-gradient-to-br from-[#c4f092] to-[#A65520] shadow-sm hover:shadow-floating transition-all duration-500"
+                className="w-[280px] md:w-[350px] shrink-0 pr-4 md:pr-6"
               >
-                <div className="relative w-full h-[350px] md:h-[500px] lg:h-[600px] rounded-[10px] overflow-hidden">
-                  {/* OPTIMIZATION: Quality 60 and Lazy load */}
-                  <Image 
-                    src={place.img || "https://res.cloudinary.com/dfdnjuhpw/image/upload/q_auto/f_auto/v1780495146/kkk_zynfng.jpg"} 
-                    alt={place.name || "Kashmir Destination"} 
-                    fill sizes="(max-width: 1024px) 100vw, 50vw" 
-                    className="object-cover transition-transform duration-[1.5s] ease-out group-hover:scale-110" 
-                    quality={60}
-                    loading="lazy"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-brand-text/90 via-brand-text/10 to-transparent opacity-80 group-hover:opacity-100 transition-opacity duration-500" />
-                  <div className="absolute bottom-8 left-8 right-8 md:bottom-12 md:left-12">
-                    <h4 className={`text-3xl md:text-4xl text-white tracking-wide group-hover:text-[#c4f092] transition-colors duration-300 drop-shadow-md ${playfair.className}`}>
-                      {place.name || "Destination"}
-                    </h4>
-                    <div className="h-[2px] w-12 bg-[#c4f092] mt-4 group-hover:w-1/3 transition-all duration-700 ease-out" />
+                <div className="group relative rounded-xl p-[2px] bg-gradient-to-br from-[#c4f092] to-[#A65520] shadow-sm hover:shadow-floating transition-all duration-500 h-[350px] md:h-[420px]">
+                  <div className="relative w-full h-full rounded-[10px] overflow-hidden bg-brand-bg">
+                    {/* Size and quality optimized for small carousel cards */}
+                    <Image 
+                      src={place.img || "https://res.cloudinary.com/dfdnjuhpw/image/upload/q_auto/f_auto/v1780495146/kkk_zynfng.jpg"} 
+                      alt={place.name || "Kashmir Destination"} 
+                      fill 
+                      sizes="(max-width: 768px) 280px, 350px" 
+                      className="object-cover transition-transform duration-[1.5s] ease-out group-hover:scale-110" 
+                      quality={60}
+                      loading="lazy"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-brand-text/90 via-brand-text/10 to-transparent opacity-80 group-hover:opacity-100 transition-opacity duration-500" />
+                    <div className="absolute bottom-6 left-6 right-6 md:bottom-8 md:left-8">
+                      <h4 className={`text-2xl md:text-3xl text-white tracking-wide group-hover:text-[#c4f092] transition-colors duration-300 drop-shadow-md ${playfair.className}`}>
+                        {place.name || "Destination"}
+                      </h4>
+                      <div className="h-[2px] w-8 bg-[#c4f092] mt-3 group-hover:w-1/2 transition-all duration-700 ease-out" />
+                    </div>
                   </div>
                 </div>
-              </motion.div>
+              </div>
             ))}
           </div>
         </div>
