@@ -172,7 +172,7 @@ export default function Footer() {
           </div>
 
           <p className="text-[10px] md:text-xs tracking-wide text-gray-400 text-center md:text-right">
-            Designed and Developed by <a href="https://haadi.publicvm.com/landing" target="_blank" rel="noopener noreferrer" className="font-bold text-[#DE9C3A] hover:text-white transition-colors tracking-widest uppercase ml-1">H Studio</a>
+            Designed and Developed by <a href="https://qurevotechnologies.vercel.app" target="_blank" rel="noopener noreferrer" className="font-bold text-[#DE9C3A] hover:text-white transition-colors tracking-widest uppercase ml-1">H Studio</a>
           </p>
         </div>
       </div>
